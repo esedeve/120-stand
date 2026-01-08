@@ -18,8 +18,35 @@ class Stand120_Take_Order {
         
         $staff_id = Stand120_Auth::get_current_staff_id();
         
+        // If staff_id is 0, try to create staff record for current user
+        if (!$staff_id && is_user_logged_in()) {
+            $user_id = get_current_user_id();
+            $user = wp_get_current_user();
+            $staff_table = $wpdb->prefix . 'stand120_staff';
+            
+            // Check if staff record exists but might be inactive
+            $existing = $wpdb->get_row($wpdb->prepare(
+                "SELECT id FROM $staff_table WHERE user_id = %d",
+                $user_id
+            ));
+            
+            if ($existing) {
+                $staff_id = $existing->id;
+                // Reactivate if inactive
+                $wpdb->update($staff_table, array('status' => 'active'), array('id' => $staff_id));
+            } else {
+                // Create new staff record
+                $wpdb->insert($staff_table, array(
+                    'user_id' => $user_id,
+                    'full_name' => $user->display_name,
+                    'role' => current_user_can('administrator') ? 'admin' : 'staff'
+                ));
+                $staff_id = $wpdb->insert_id;
+            }
+        }
+        
         if (!$staff_id) {
-            return array('success' => false, 'message' => 'Staff not found');
+            return array('success' => false, 'message' => 'Staff not found. Please login again.');
         }
         
         // Validate and parse items
@@ -53,8 +80,17 @@ class Stand120_Take_Order {
         $cash_amount = floatval($data['cash_amount'] ?? 0);
         $transfer_amount = floatval($data['transfer_amount'] ?? 0);
         
-        // Validate payment
-        if ($payment_method === 'both') {
+        // Auto-set amounts based on payment method if not explicitly provided
+        if ($payment_method === 'transfer' && $transfer_amount == 0) {
+            // Full amount is transfer
+            $transfer_amount = $grand_total;
+            $cash_amount = 0;
+        } elseif ($payment_method === 'cash' && $cash_amount == 0) {
+            // Full amount is cash
+            $cash_amount = $grand_total;
+            $transfer_amount = 0;
+        } elseif ($payment_method === 'both') {
+            // Both methods - validate total matches
             if (($cash_amount + $transfer_amount) < $grand_total) {
                 return array('success' => false, 'message' => 'Payment amounts do not match total');
             }

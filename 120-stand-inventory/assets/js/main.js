@@ -675,6 +675,12 @@ const TakeOrder = {
             return;
         }
         
+        // Validate payment method is selected
+        if (!paymentMethod) {
+            Stand120.showAlert('danger', 'Please select a payment method.');
+            return;
+        }
+        
         // Check if confirmation is needed (for transfer or both)
         if ((paymentMethod === 'transfer' || paymentMethod === 'both') && !data.payment_confirmed) {
             Stand120.showAlert('warning', 'Please confirm payment has been received before submitting.');
@@ -717,14 +723,19 @@ const TakeOrder = {
             return;
         }
         
+        // Log the data being sent for debugging
+        console.log('Submitting order data:', data);
+        
         Stand120.ajax('submit_order', data).then(response => {
+            console.log('Order response:', response);
             if (response.success) {
-                Stand120.showAlert('success', 'Order submitted successfully!');
+                Stand120.showAlert('success', 'Order #' + (response.data.order_id || '') + ' submitted successfully!');
                 this.resetForm();
             } else {
                 Stand120.showAlert('danger', response.data?.message || 'Failed to submit order.');
             }
         }).catch(error => {
+            console.error('Order submission error:', error);
             Stand120.showAlert('danger', 'An error occurred. Please try again.');
         }).finally(() => {
             this.isSubmitting = false;
