@@ -866,6 +866,7 @@ const OrderPreparation = {
             if (response.success) {
                 $row.addClass('saved');
                 setTimeout(() => $row.removeClass('saved'), 500);
+                console.log('Order Preparation saved - Closing calculated:', response.data?.data?.closing || 'N/A');
             }
         });
     }
@@ -976,6 +977,12 @@ const StockInventory = {
             product_id: productId,
             date: date,
             used_packs: used
+        }).then(response => {
+            if (response.success) {
+                $row.addClass('saved');
+                setTimeout(() => $row.removeClass('saved'), 500);
+                console.log('Stock Inventory saved - Closing calculated:', response.data?.data?.closing || 'N/A');
+            }
         });
     }
 };
@@ -1092,6 +1099,16 @@ const ChoppingInventory = {
             prepared: prepared,
             packs_gotten: packs,
             remarks: remarks
+        }).then(response => {
+            if (response.success) {
+                $row.addClass('saved');
+                setTimeout(() => $row.removeClass('saved'), 500);
+                
+                // If packs_gotten is updated, the Stock Inventory is also updated automatically
+                if (packs > 0) {
+                    console.log('Chopping Inventory saved - Stock Inventory has been updated with packs gotten:', packs);
+                }
+            }
         });
     }
 };
@@ -1181,6 +1198,11 @@ const ImportRecord = {
                     .removeClass('status-syncing status-pending')
                     .addClass('status-synced')
                     .html('<i class="fas fa-check"></i> synced');
+                
+                // Show notification that connected forms are updated
+                if (response.data && response.data.sync_status === 'synced') {
+                    console.log('Import Record saved - Connected forms (Stock Inventory, Chopping Inventory) have been updated.');
+                }
             }
         });
     }
