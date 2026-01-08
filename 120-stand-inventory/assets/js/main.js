@@ -493,8 +493,27 @@ const TakeOrder = {
     isSubmitting: false,
     
     init: function() {
+        const self = this;
         this.bindEvents();
         this.calculateTotals(); // Initial calculation
+        
+        // Initialize payment method click handlers directly
+        $('.payment-option').on('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Remove selected class from all options
+            $('.payment-option').removeClass('selected');
+            // Add selected class to clicked option
+            $(this).addClass('selected');
+            
+            // Check the radio button
+            const $radio = $(this).find('input[type="radio"]');
+            $radio.prop('checked', true);
+            
+            // Trigger the payment method change
+            self.handlePaymentMethodChange();
+        });
     },
     
     bindEvents: function() {
@@ -517,10 +536,6 @@ const TakeOrder = {
         $(document).on('input.takeorder change.takeorder keyup.takeorder', '#cashAmount, #transferAmount', function() {
             self.calculateTotals();
         });
-        
-        // Payment method change
-        $(document).off('change.takeorder', 'input[name="payment_method"]');
-        $(document).on('change.takeorder', 'input[name="payment_method"]', this.handlePaymentMethodChange.bind(this));
         
         // Submit button
         $(document).off('click.takeorder', '#submitOrder');
@@ -585,22 +600,32 @@ const TakeOrder = {
     handlePaymentMethodChange: function() {
         const method = $('input[name="payment_method"]:checked').val();
         
+        console.log('Payment method changed to:', method);
+        
         // Hide all payment sections first
-        $('#cashSection, #transferSection, #confirmationSection').hide();
-        $('#cashAmount, #transferAmount').prop('disabled', true);
+        $('#cashSection').hide();
+        $('#transferSection').hide();
+        $('#confirmationSection').hide();
+        $('#cashAmount').prop('disabled', true).val('');
+        $('#transferAmount').prop('disabled', true).val('');
         
         if (method === 'both') {
             // Both - show both sections and confirmation
-            $('#cashSection, #transferSection, #confirmationSection').show();
-            $('#cashAmount, #transferAmount').prop('disabled', false);
+            $('#cashSection').slideDown(200);
+            $('#transferSection').slideDown(200);
+            $('#confirmationSection').slideDown(200);
+            $('#cashAmount').prop('disabled', false);
+            $('#transferAmount').prop('disabled', false);
         } else if (method === 'cash') {
             // Cash only - show cash section
-            $('#cashSection').show();
+            $('#cashSection').slideDown(200);
             $('#cashAmount').prop('disabled', false);
         } else if (method === 'transfer') {
             // Transfer/Card - show confirmation
-            $('#confirmationSection').show();
+            $('#confirmationSection').slideDown(200);
         }
+        
+        this.calculateTotals();
     },
     
     collectOrderData: function() {

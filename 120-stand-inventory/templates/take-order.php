@@ -173,35 +173,12 @@ include STAND120_PLUGIN_DIR . 'templates/partials/header.php';
 </form>
 
 <script>
-    $(document).ready(function() {
+    jQuery(document).ready(function($) {
+        // Initialize TakeOrder
         TakeOrder.init();
         
-        // Payment method toggle - enhanced version
-        $('input[name="payment_method"]').on('change', function() {
-            $('.payment-option').removeClass('selected');
-            $(this).closest('.payment-option').addClass('selected');
-            
-            const method = $(this).val();
-            
-            // Hide all sections first
-            $('#cashSection, #transferSection, #confirmationSection').hide();
-            $('#cashAmount, #transferAmount').prop('disabled', true).val('');
-            
-            if (method === 'cash') {
-                // Cash only - show cash section, no confirmation needed
-                $('#cashSection').show();
-                $('#cashAmount').prop('disabled', false);
-            } else if (method === 'transfer') {
-                // Transfer/Card only - show confirmation checkbox
-                $('#confirmationSection').show();
-            } else if (method === 'both') {
-                // Both - show both sections and confirmation
-                $('#cashSection, #transferSection, #confirmationSection').show();
-                $('#cashAmount, #transferAmount').prop('disabled', false);
-            }
-            
-            TakeOrder.calculateTotals();
-        });
+        // Calculate totals immediately
+        TakeOrder.calculateTotals();
     });
 </script>
 
