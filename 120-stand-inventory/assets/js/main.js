@@ -494,13 +494,22 @@ const TakeOrder = {
     
     init: function() {
         this.bindEvents();
-        this.loadMenuItems();
+        this.calculateTotals(); // Initial calculation
     },
     
     bindEvents: function() {
-        $(document).on('input', '.qty-input', this.calculateTotals.bind(this));
-        $(document).on('change', 'input[name="payment_method"]', this.handlePaymentMethodChange.bind(this));
-        $(document).on('click', '#submitOrder', this.handleSubmit.bind(this));
+        // Use event delegation for dynamically loaded items
+        $(document).off('input.takeorder', '.qty-input');
+        $(document).on('input.takeorder', '.qty-input', () => this.calculateTotals());
+        
+        $(document).off('input.takeorder', '#deliveryFee');
+        $(document).on('input.takeorder', '#deliveryFee', () => this.calculateTotals());
+        
+        $(document).off('change.takeorder', 'input[name="payment_method"]');
+        $(document).on('change.takeorder', 'input[name="payment_method"]', this.handlePaymentMethodChange.bind(this));
+        
+        $(document).off('click.takeorder', '#submitOrder');
+        $(document).on('click.takeorder', '#submitOrder', this.handleSubmit.bind(this));
     },
     
     loadMenuItems: function() {
@@ -543,7 +552,9 @@ const TakeOrder = {
             subtotal += total;
         });
         
-        const deliveryFee = Stand120.parseNumber($('#deliveryFee').val()) || 0;
+        // Parse delivery fee, remove commas if present
+        const deliveryFeeVal = $('#deliveryFee').val() || '0';
+        const deliveryFee = parseFloat(deliveryFeeVal.toString().replace(/,/g, '')) || 0;
         const grandTotal = subtotal + deliveryFee;
         
         $('#subtotal').text('₦' + Stand120.formatNumber(subtotal));
@@ -683,7 +694,12 @@ const OrderPreparation = {
     },
     
     bindEvents: function() {
-        $(document).on('input', '.prep-added, .prep-sold', this.handleInputChange.bind(this));
+        // Use namespaced events and arrow functions to preserve 'this' context
+        $(document).off('input.orderprep', '.prep-added, .prep-sold');
+        $(document).on('input.orderprep', '.prep-added, .prep-sold', (e) => this.handleInputChange(e));
+        
+        $(document).off('input.orderprep', '.prep-opening');
+        $(document).on('input.orderprep', '.prep-opening', (e) => this.handleInputChange(e));
     },
     
     loadData: function() {
@@ -691,7 +707,7 @@ const OrderPreparation = {
         
         Stand120.ajax('get_order_preparation', { date: date }).then(response => {
             if (response.success) {
-                this.data = response.data.data;
+                this.data = response.data.data || [];
                 this.renderTable();
             }
         });
@@ -703,29 +719,39 @@ const OrderPreparation = {
         
         const isAdmin = Stand120.config.is_admin;
         
+        if (!this.data || this.data.length === 0) {
+            $tbody.append('<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No fruits found. Admin can add fruits in the Admin Panel.</td></tr>');
+            return;
+        }
+        
         this.data.forEach(item => {
+            const opening = parseFloat(item.opening) || 0;
+            const added = parseFloat(item.total_added) || 0;
+            const sold = parseFloat(item.total_sold) || 0;
+            const closing = opening + added - sold;
+            
             const row = `
                 <tr data-product-id="${item.product_id}">
                     <td>${item.product_name}</td>
                     <td>
                         <input type="number" class="table-input prep-opening" 
-                            value="${item.opening}" 
+                            value="${opening}" 
                             ${!isAdmin ? 'readonly' : ''} 
                             data-field="opening">
                     </td>
                     <td>
                         <input type="number" class="table-input prep-added auto-save-input" 
-                            value="${item.total_added}" min="0" 
+                            value="${added}" min="0" 
                             data-field="total_added"
                             data-save-action="save_order_preparation">
                     </td>
                     <td>
                         <input type="number" class="table-input prep-sold auto-save-input" 
-                            value="${item.total_sold}" min="0" 
+                            value="${sold}" min="0" 
                             data-field="total_sold"
                             data-save-action="save_order_preparation">
                     </td>
-                    <td class="prep-closing formatted-number">${item.closing}</td>
+                    <td class="prep-closing formatted-number">${Stand120.formatNumber(closing)}</td>
                 </tr>
             `;
             $tbody.append(row);
@@ -743,8 +769,9 @@ const OrderPreparation = {
         
         $row.find('.prep-closing').text(Stand120.formatNumber(closing));
         
-        // Auto-save
-        this.saveRow($row);
+        // Auto-save with debounce
+        clearTimeout($row.data('saveTimeout'));
+        $row.data('saveTimeout', setTimeout(() => this.saveRow($row), 500));
     },
     
     saveRow: function($row) {
@@ -779,7 +806,11 @@ const StockInventory = {
     },
     
     bindEvents: function() {
-        $(document).on('input', '.stock-used', this.handleInputChange.bind(this));
+        $(document).off('input.stockinv', '.stock-used');
+        $(document).on('input.stockinv', '.stock-used', (e) => this.handleInputChange(e));
+        
+        $(document).off('input.stockinv', '.stock-opening');
+        $(document).on('input.stockinv', '.stock-opening', (e) => this.handleInputChange(e));
     },
     
     loadData: function() {
@@ -787,7 +818,7 @@ const StockInventory = {
         
         Stand120.ajax('get_stock_inventory', { date: date }).then(response => {
             if (response.success) {
-                this.data = response.data.data;
+                this.data = response.data.data || [];
                 this.renderTable();
             }
         });
@@ -799,7 +830,17 @@ const StockInventory = {
         
         const isAdmin = Stand120.config.is_admin;
         
+        if (!this.data || this.data.length === 0) {
+            $tbody.append('<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No products found. Admin can add products in the Admin Panel.</td></tr>');
+            return;
+        }
+        
         this.data.forEach(item => {
+            const opening = parseFloat(item.opening) || 0;
+            const added = parseFloat(item.added) || 0;
+            const used = parseFloat(item.used) || 0;
+            const closing = opening + added - used;
+            
             const row = `
                 <tr data-product-id="${item.product_id}">
                     <td>
@@ -808,18 +849,18 @@ const StockInventory = {
                     </td>
                     <td>
                         <input type="number" class="table-input stock-opening" 
-                            value="${item.opening}" 
+                            value="${opening}" 
                             ${!isAdmin ? 'readonly' : ''} 
                             data-field="opening">
                     </td>
-                    <td class="stock-added formatted-number">${item.added}</td>
+                    <td class="stock-added formatted-number">${Stand120.formatNumber(added)}</td>
                     <td>
                         <input type="number" class="table-input stock-used auto-save-input" 
-                            value="${item.used}" min="0" 
+                            value="${used}" min="0" 
                             data-field="used_packs"
                             data-save-action="save_stock_inventory">
                     </td>
-                    <td class="stock-closing formatted-number">${item.closing}</td>
+                    <td class="stock-closing formatted-number">${Stand120.formatNumber(closing)}</td>
                 </tr>
             `;
             $tbody.append(row);
@@ -831,14 +872,16 @@ const StockInventory = {
         const $row = $input.closest('tr');
         
         const opening = parseFloat($row.find('.stock-opening').val()) || 0;
-        const added = parseFloat($row.find('.stock-added').text().replace(/,/g, '')) || 0;
+        const addedText = $row.find('.stock-added').text().replace(/,/g, '');
+        const added = parseFloat(addedText) || 0;
         const used = parseFloat($row.find('.stock-used').val()) || 0;
         const closing = opening + added - used;
         
         $row.find('.stock-closing').text(Stand120.formatNumber(closing));
         
-        // Auto-save
-        this.saveRow($row);
+        // Auto-save with debounce
+        clearTimeout($row.data('saveTimeout'));
+        $row.data('saveTimeout', setTimeout(() => this.saveRow($row), 500));
     },
     
     saveRow: function($row) {
@@ -866,7 +909,11 @@ const ChoppingInventory = {
     },
     
     bindEvents: function() {
-        $(document).on('input', '.chop-prepared, .chop-packs, .chop-remarks', this.handleInputChange.bind(this));
+        $(document).off('input.chopinv', '.chop-prepared, .chop-packs, .chop-remarks');
+        $(document).on('input.chopinv', '.chop-prepared, .chop-packs, .chop-remarks', (e) => this.handleInputChange(e));
+        
+        $(document).off('input.chopinv', '.chop-opening');
+        $(document).on('input.chopinv', '.chop-opening', (e) => this.handleInputChange(e));
     },
     
     loadData: function() {
@@ -874,7 +921,7 @@ const ChoppingInventory = {
         
         Stand120.ajax('get_chopping_inventory', { date: date }).then(response => {
             if (response.success) {
-                this.data = response.data.data;
+                this.data = response.data.data || [];
                 this.renderTable();
             }
         });
@@ -886,24 +933,35 @@ const ChoppingInventory = {
         
         const isAdmin = Stand120.config.is_admin;
         
+        if (!this.data || this.data.length === 0) {
+            $tbody.append('<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No fruits found. Admin can add fruits in the Admin Panel.</td></tr>');
+            return;
+        }
+        
         this.data.forEach(item => {
+            const opening = parseFloat(item.opening) || 0;
+            const importVal = parseFloat(item.import) || 0;
+            const prepared = parseFloat(item.prepared) || 0;
+            const closing = opening + importVal - prepared;
+            const packs = parseFloat(item.packs_gotten) || 0;
+            
             const row = `
                 <tr data-product-id="${item.product_id}">
                     <td>${item.product_name}</td>
                     <td>
                         <input type="number" class="table-input chop-opening" 
-                            value="${item.opening}" 
+                            value="${opening}" 
                             ${!isAdmin ? 'readonly' : ''}>
                     </td>
-                    <td class="chop-import formatted-number">${item.import}</td>
+                    <td class="chop-import formatted-number">${Stand120.formatNumber(importVal)}</td>
                     <td>
                         <input type="number" class="table-input chop-prepared auto-save-input" 
-                            value="${item.prepared}" min="0">
+                            value="${prepared}" min="0">
                     </td>
-                    <td class="chop-closing formatted-number">${item.closing}</td>
+                    <td class="chop-closing formatted-number">${Stand120.formatNumber(closing)}</td>
                     <td>
                         <input type="number" class="table-input chop-packs auto-save-input" 
-                            value="${item.packs_gotten}" min="0">
+                            value="${packs}" min="0">
                     </td>
                     <td>
                         <input type="text" class="table-input chop-remarks auto-save-input" 
@@ -920,14 +978,16 @@ const ChoppingInventory = {
         const $row = $input.closest('tr');
         
         const opening = parseFloat($row.find('.chop-opening').val()) || 0;
-        const importVal = parseFloat($row.find('.chop-import').text().replace(/,/g, '')) || 0;
+        const importText = $row.find('.chop-import').text().replace(/,/g, '');
+        const importVal = parseFloat(importText) || 0;
         const prepared = parseFloat($row.find('.chop-prepared').val()) || 0;
         const closing = opening + importVal - prepared;
         
         $row.find('.chop-closing').text(Stand120.formatNumber(closing));
         
-        // Auto-save
-        this.saveRow($row);
+        // Auto-save with debounce
+        clearTimeout($row.data('saveTimeout'));
+        $row.data('saveTimeout', setTimeout(() => this.saveRow($row), 500));
     },
     
     saveRow: function($row) {
@@ -1042,6 +1102,7 @@ const ImportRecord = {
  */
 const FinancialSummary = {
     data: {},
+    saveTimeout: null,
     
     init: function() {
         this.bindEvents();
@@ -1049,8 +1110,16 @@ const FinancialSummary = {
     },
     
     bindEvents: function() {
-        $(document).on('input', '#extrasAmount, #expensesAmount', this.handleInputChange.bind(this));
-        $(document).on('blur', '#extrasRemark, #expensesRemark', this.saveData.bind(this));
+        $(document).off('input.finsummary', '#extrasAmount, #expensesAmount');
+        $(document).on('input.finsummary', '#extrasAmount, #expensesAmount', () => this.handleInputChange());
+        
+        $(document).off('input.finsummary', '#extrasRemark, #expensesRemark');
+        $(document).on('input.finsummary', '#extrasRemark, #expensesRemark', () => this.debouncedSave());
+    },
+    
+    debouncedSave: function() {
+        clearTimeout(this.saveTimeout);
+        this.saveTimeout = setTimeout(() => this.saveData(), 500);
     },
     
     loadData: function() {
@@ -1058,7 +1127,7 @@ const FinancialSummary = {
         
         Stand120.ajax('get_financial_summary', { date: date }).then(response => {
             if (response.success) {
-                this.data = response.data;
+                this.data = response.data || {};
                 this.renderData();
             }
         });
@@ -1067,29 +1136,37 @@ const FinancialSummary = {
     renderData: function() {
         const data = this.data;
         
-        $('#totalSales').text('₦' + Stand120.formatNumber(data.total_sales));
-        $('#transferSales').text('₦' + Stand120.formatNumber(data.transfer_sales));
-        $('#cashSales').text('₦' + Stand120.formatNumber(data.cash_sales));
-        $('#deliveryFees').text('₦' + Stand120.formatNumber(data.delivery_fees));
-        $('#oldCash').text('₦' + Stand120.formatNumber(data.old_cash));
-        $('#cashLeft').text('₦' + Stand120.formatNumber(data.cash_left));
+        $('#totalSales').text('₦' + Stand120.formatNumber(data.total_sales || 0));
+        $('#transferSales').text('₦' + Stand120.formatNumber(data.transfer_sales || 0));
+        $('#cashSales').text('₦' + Stand120.formatNumber(data.cash_sales || 0));
+        $('#deliveryFees').text('₦' + Stand120.formatNumber(data.delivery_fees || 0));
+        $('#oldCash').text('₦' + Stand120.formatNumber(data.old_cash || 0));
         
         $('#extrasAmount').val(data.extras_amount || '');
         $('#extrasRemark').val(data.extras_remark || '');
         $('#expensesAmount').val(data.expenses_amount || '');
         $('#expensesRemark').val(data.expenses_remark || '');
+        
+        this.calculateCashLeft();
     },
     
     handleInputChange: function() {
         this.calculateCashLeft();
-        Stand120.debounce(this.saveData.bind(this), 500)();
+        this.debouncedSave();
     },
     
     calculateCashLeft: function() {
-        const cashSales = Stand120.parseNumber($('#cashSales').text().replace('₦', ''));
-        const oldCash = Stand120.parseNumber($('#oldCash').text().replace('₦', ''));
-        const extras = Stand120.parseNumber($('#extrasAmount').val());
-        const expenses = Stand120.parseNumber($('#expensesAmount').val());
+        const cashSalesText = $('#cashSales').text().replace(/[₦,]/g, '');
+        const cashSales = parseFloat(cashSalesText) || 0;
+        
+        const oldCashText = $('#oldCash').text().replace(/[₦,]/g, '');
+        const oldCash = parseFloat(oldCashText) || 0;
+        
+        const extrasVal = $('#extrasAmount').val() || '0';
+        const extras = parseFloat(extrasVal.toString().replace(/,/g, '')) || 0;
+        
+        const expensesVal = $('#expensesAmount').val() || '0';
+        const expenses = parseFloat(expensesVal.toString().replace(/,/g, '')) || 0;
         
         const cashLeft = (cashSales + oldCash + extras) - expenses;
         $('#cashLeft').text('₦' + Stand120.formatNumber(cashLeft));

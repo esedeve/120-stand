@@ -8,20 +8,20 @@
     --primary-color: #8B0000;
     --primary-dark: #5C0000;
     --primary-light: #A52A2A;
-    --bg-primary: #2D1F1F;
-    --bg-secondary: #3D2B2B;
-    --bg-card: rgba(61, 43, 43, 0.7);
-    --bg-glass: rgba(139, 0, 0, 0.15);
-    --text-primary: #FFFFFF;
-    --text-secondary: rgba(255, 255, 255, 0.8);
-    --text-muted: rgba(255, 255, 255, 0.6);
-    --border-color: rgba(255, 255, 255, 0.1);
-    --border-glass: rgba(255, 255, 255, 0.2);
+    --bg-primary: #FFF5F5;
+    --bg-secondary: #FFEAEA;
+    --bg-card: rgba(255, 245, 245, 0.9);
+    --bg-glass: rgba(139, 0, 0, 0.08);
+    --text-primary: #2D1F1F;
+    --text-secondary: rgba(45, 31, 31, 0.85);
+    --text-muted: rgba(45, 31, 31, 0.6);
+    --border-color: rgba(139, 0, 0, 0.15);
+    --border-glass: rgba(139, 0, 0, 0.2);
     --success-color: #28a745;
     --warning-color: #ffc107;
     --danger-color: #dc3545;
     --info-color: #17a2b8;
-    --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    --shadow-glass: 0 8px 32px 0 rgba(139, 0, 0, 0.15);
     --blur-glass: blur(10px);
     --transition-fast: 0.2s ease;
     --transition-normal: 0.3s ease;
@@ -475,7 +475,7 @@
 .form-control {
     width: 100%;
     padding: 12px 16px;
-    background: var(--bg-glass);
+    background: #FFFFFF;
     border: 1px solid var(--border-glass);
     border-radius: var(--border-radius-sm);
     color: var(--text-primary);
@@ -486,7 +486,7 @@
 .form-control:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.2);
+    box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.15);
 }
 
 .form-control::placeholder {
@@ -495,13 +495,13 @@
 
 .form-control:disabled,
 .form-control[readonly] {
-    background: rgba(61, 43, 43, 0.5);
+    background: rgba(139, 0, 0, 0.05);
     cursor: not-allowed;
 }
 
 select.form-control {
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='white' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238B0000' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 16px center;
     padding-right: 40px;
@@ -578,7 +578,7 @@ select.form-control {
     width: 100%;
     max-width: 120px;
     padding: 8px 12px;
-    background: var(--bg-secondary);
+    background: #FFFFFF;
     border: 1px solid var(--border-glass);
     border-radius: var(--border-radius-sm);
     color: var(--text-primary);
@@ -589,11 +589,12 @@ select.form-control {
 .table-input:focus {
     outline: none;
     border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.1);
 }
 
 .table-input:disabled,
 .table-input[readonly] {
-    background: rgba(45, 31, 31, 0.5);
+    background: rgba(139, 0, 0, 0.05);
     cursor: not-allowed;
 }
 
@@ -762,7 +763,7 @@ select.form-control {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.5);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -778,7 +779,7 @@ select.form-control {
 }
 
 .modal-content {
-    background: var(--bg-secondary);
+    background: #FFFFFF;
     backdrop-filter: var(--blur-glass);
     -webkit-backdrop-filter: var(--blur-glass);
     border-radius: var(--border-radius);
@@ -789,6 +790,7 @@ select.form-control {
     overflow-y: auto;
     transform: scale(0.9);
     transition: transform var(--transition-normal);
+    box-shadow: 0 20px 60px rgba(139, 0, 0, 0.2);
 }
 
 .modal-overlay.active .modal-content {
@@ -974,7 +976,7 @@ select.form-control {
     bottom: 0;
     left: 0;
     width: 100%;
-    background: var(--bg-secondary);
+    background: #FFFFFF;
     backdrop-filter: var(--blur-glass);
     -webkit-backdrop-filter: var(--blur-glass);
     border-top: 1px solid var(--border-glass);
@@ -983,6 +985,7 @@ select.form-control {
     padding: 8px 0;
     padding-bottom: calc(8px + env(safe-area-inset-bottom));
     z-index: 1000;
+    box-shadow: 0 -4px 20px rgba(139, 0, 0, 0.1);
 }
 
 .bottom-nav-item {
@@ -1022,7 +1025,7 @@ select.form-control {
 }
 
 .login-card {
-    background: var(--bg-glass);
+    background: #FFFFFF;
     backdrop-filter: var(--blur-glass);
     -webkit-backdrop-filter: var(--blur-glass);
     border-radius: var(--border-radius-lg);
@@ -1031,6 +1034,7 @@ select.form-control {
     width: 100%;
     max-width: 400px;
     text-align: center;
+    box-shadow: 0 20px 60px rgba(139, 0, 0, 0.15);
 }
 
 .login-logo {
