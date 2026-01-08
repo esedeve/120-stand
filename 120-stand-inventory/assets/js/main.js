@@ -1,0 +1,1440 @@
+/**
+ * 120 Stand Inventory Management - Main JavaScript
+ */
+
+(function($) {
+    'use strict';
+
+    // Global App Object
+    window.Stand120 = {
+        config: {},
+        data: {},
+        cache: {},
+        
+        /**
+         * Initialize the application
+         */
+        init: function() {
+            this.config = window.stand120_ajax || {};
+            this.bindEvents();
+            this.initComponents();
+            this.startClock();
+            this.checkOnlineStatus();
+        },
+        
+        /**
+         * Bind global events
+         */
+        bindEvents: function() {
+            // Hamburger menu
+            $(document).on('click', '.hamburger-menu', this.toggleMobileSidebar);
+            $(document).on('click', '.mobile-sidebar-overlay', this.closeMobileSidebar);
+            
+            // Scroll to top
+            $(window).on('scroll', this.handleScroll);
+            $(document).on('click', '.scroll-to-top', this.scrollToTop);
+            
+            // Online/Offline detection
+            window.addEventListener('online', () => this.handleOnline());
+            window.addEventListener('offline', () => this.handleOffline());
+            
+            // Form auto-save
+            $(document).on('input', '.auto-save-input', this.debounce(this.handleAutoSave, 500));
+            
+            // Number formatting
+            $(document).on('input', '.number-input', this.formatNumberInput);
+            $(document).on('focus', '.number-input', this.clearNumberFormat);
+            $(document).on('blur', '.number-input', this.applyNumberFormat);
+            
+            // Modal events
+            $(document).on('click', '.modal-close, .modal-cancel', this.closeModal);
+            $(document).on('click', '.modal-overlay', function(e) {
+                if (e.target === this) Stand120.closeModal();
+            });
+            
+            // Tabs
+            $(document).on('click', '.tab-btn', this.handleTabClick);
+        },
+        
+        /**
+         * Initialize components
+         */
+        initComponents: function() {
+            this.initScrollToTop();
+            this.initTooltips();
+            this.loadCachedData();
+        },
+        
+        /**
+         * Start real-time clock
+         */
+        startClock: function() {
+            const updateClock = () => {
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    second: '2-digit',
+                    hour12: true 
+                });
+                const dateStr = now.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                
+                $('.digital-clock').text(timeStr);
+                $('.date-text').text(dateStr);
+            };
+            
+            updateClock();
+            setInterval(updateClock, 1000);
+        },
+        
+        /**
+         * Toggle mobile sidebar
+         */
+        toggleMobileSidebar: function() {
+            $('.hamburger-menu').toggleClass('active');
+            $('.mobile-sidebar').toggleClass('active');
+            $('.mobile-sidebar-overlay').toggleClass('active');
+            $('body').toggleClass('sidebar-open');
+        },
+        
+        /**
+         * Close mobile sidebar
+         */
+        closeMobileSidebar: function() {
+            $('.hamburger-menu').removeClass('active');
+            $('.mobile-sidebar').removeClass('active');
+            $('.mobile-sidebar-overlay').removeClass('active');
+            $('body').removeClass('sidebar-open');
+        },
+        
+        /**
+         * Handle scroll events
+         */
+        handleScroll: function() {
+            const scrollTop = $(window).scrollTop();
+            const docHeight = $(document).height() - $(window).height();
+            const scrollPercent = (scrollTop / docHeight) * 100;
+            
+            // Show/hide scroll to top button
+            if (scrollTop > 300) {
+                $('.scroll-to-top').addClass('visible');
+            } else {
+                $('.scroll-to-top').removeClass('visible');
+            }
+            
+            // Update progress ring
+            const circumference = 2 * Math.PI * 25;
+            const offset = circumference - (scrollPercent / 100) * circumference;
+            $('.scroll-progress-ring .progress').css('stroke-dashoffset', offset);
+        },
+        
+        /**
+         * Initialize scroll to top button
+         */
+        initScrollToTop: function() {
+            const circumference = 2 * Math.PI * 25;
+            $('.scroll-progress-ring .progress').css({
+                'stroke-dasharray': circumference,
+                'stroke-dashoffset': circumference
+            });
+        },
+        
+        /**
+         * Scroll to top
+         */
+        scrollToTop: function() {
+            $('html, body').animate({ scrollTop: 0 }, 500);
+        },
+        
+        /**
+         * Check online status
+         */
+        checkOnlineStatus: function() {
+            if (!navigator.onLine) {
+                this.handleOffline();
+            }
+        },
+        
+        /**
+         * Handle online event
+         */
+        handleOnline: function() {
+            $('.offline-banner').removeClass('visible');
+            this.syncOfflineData();
+        },
+        
+        /**
+         * Handle offline event
+         */
+        handleOffline: function() {
+            $('.offline-banner').addClass('visible');
+        },
+        
+        /**
+         * Load cached data from localStorage
+         */
+        loadCachedData: function() {
+            const cached = localStorage.getItem('stand120_cache');
+            if (cached) {
+                this.cache = JSON.parse(cached);
+            }
+        },
+        
+        /**
+         * Save data to cache
+         */
+        saveToCache: function(key, data) {
+            this.cache[key] = {
+                data: data,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('stand120_cache', JSON.stringify(this.cache));
+        },
+        
+        /**
+         * Get cached data
+         */
+        getFromCache: function(key, maxAge = 300000) {
+            const cached = this.cache[key];
+            if (cached && (Date.now() - cached.timestamp) < maxAge) {
+                return cached.data;
+            }
+            return null;
+        },
+        
+        /**
+         * Save data for offline sync
+         */
+        saveOfflineData: function(type, data) {
+            let offlineQueue = JSON.parse(localStorage.getItem('stand120_offline_queue') || '[]');
+            offlineQueue.push({
+                type: type,
+                data: data,
+                local_id: 'local_' + Date.now(),
+                timestamp: Date.now()
+            });
+            localStorage.setItem('stand120_offline_queue', JSON.stringify(offlineQueue));
+        },
+        
+        /**
+         * Sync offline data
+         */
+        syncOfflineData: function() {
+            const offlineQueue = JSON.parse(localStorage.getItem('stand120_offline_queue') || '[]');
+            
+            if (offlineQueue.length === 0) return;
+            
+            this.ajax('sync_offline_data', {
+                offline_data: JSON.stringify(offlineQueue)
+            }).then(response => {
+                if (response.success) {
+                    localStorage.setItem('stand120_offline_queue', '[]');
+                    this.showAlert('success', 'Offline data synced successfully!');
+                }
+            }).catch(() => {
+                // Keep data for next sync attempt
+            });
+        },
+        
+        /**
+         * AJAX helper
+         */
+        ajax: function(action, data = {}) {
+            return new Promise((resolve, reject) => {
+                data.action = 'stand120_action';
+                data.stand120_action = action;
+                data.nonce = this.config.nonce;
+                
+                $.ajax({
+                    url: this.config.ajax_url,
+                    type: 'POST',
+                    data: data,
+                    success: function(response) {
+                        resolve(response);
+                    },
+                    error: function(xhr, status, error) {
+                        reject(error);
+                    }
+                });
+            });
+        },
+        
+        /**
+         * Show loading overlay
+         */
+        showLoading: function(message = 'Loading...') {
+            $('.loading-overlay').addClass('active');
+            $('.loading-overlay .loading-text').text(message);
+        },
+        
+        /**
+         * Hide loading overlay
+         */
+        hideLoading: function() {
+            $('.loading-overlay').removeClass('active');
+        },
+        
+        /**
+         * Show alert
+         */
+        showAlert: function(type, message) {
+            const alertHtml = `
+                <div class="alert alert-${type}" role="alert">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : 'info-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            // Remove existing alerts
+            $('.alert').remove();
+            
+            // Add new alert
+            $('.page-content').prepend(alertHtml);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                $('.alert').fadeOut(300, function() {
+                    $(this).remove();
+                });
+            }, 5000);
+        },
+        
+        /**
+         * Show modal
+         */
+        showModal: function(options) {
+            const modal = $(`
+                <div class="modal-overlay active">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 class="modal-title">${options.title || 'Confirm'}</h3>
+                            <button class="modal-close"><i class="fas fa-times"></i></button>
+                        </div>
+                        <div class="modal-body">
+                            ${options.content || ''}
+                        </div>
+                        <div class="modal-footer">
+                            ${options.showCancel !== false ? '<button class="btn btn-secondary modal-cancel">Cancel</button>' : ''}
+                            <button class="btn btn-primary modal-confirm">${options.confirmText || 'Confirm'}</button>
+                        </div>
+                    </div>
+                </div>
+            `);
+            
+            $('body').append(modal);
+            
+            return new Promise((resolve, reject) => {
+                modal.find('.modal-confirm').on('click', function() {
+                    Stand120.closeModal();
+                    resolve(true);
+                });
+                
+                modal.find('.modal-cancel, .modal-close').on('click', function() {
+                    Stand120.closeModal();
+                    resolve(false);
+                });
+            });
+        },
+        
+        /**
+         * Close modal
+         */
+        closeModal: function() {
+            $('.modal-overlay').removeClass('active');
+            setTimeout(() => {
+                $('.modal-overlay').remove();
+            }, 300);
+        },
+        
+        /**
+         * Format number with commas
+         */
+        formatNumber: function(num) {
+            if (!num && num !== 0) return '';
+            return parseFloat(num).toLocaleString('en-NG', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2
+            });
+        },
+        
+        /**
+         * Parse formatted number
+         */
+        parseNumber: function(str) {
+            if (!str) return 0;
+            return parseFloat(str.toString().replace(/,/g, '')) || 0;
+        },
+        
+        /**
+         * Format number input on blur
+         */
+        formatNumberInput: function() {
+            const $input = $(this);
+            const value = $input.val().replace(/,/g, '');
+            if (value && !isNaN(value)) {
+                $input.val(Stand120.formatNumber(value));
+            }
+        },
+        
+        /**
+         * Clear number format on focus
+         */
+        clearNumberFormat: function() {
+            const $input = $(this);
+            const value = $input.val().replace(/,/g, '');
+            $input.val(value);
+        },
+        
+        /**
+         * Apply number format
+         */
+        applyNumberFormat: function() {
+            const $input = $(this);
+            const value = $input.val();
+            if (value && !isNaN(value)) {
+                $input.val(Stand120.formatNumber(value));
+            }
+        },
+        
+        /**
+         * Handle auto-save
+         */
+        handleAutoSave: function() {
+            const $input = $(this);
+            const saveAction = $input.data('save-action');
+            const saveData = {};
+            
+            // Collect all data from the row/form
+            $input.closest('tr, .form-group').find('[data-field]').each(function() {
+                saveData[$(this).data('field')] = $(this).val();
+            });
+            
+            if (saveAction && Object.keys(saveData).length > 0) {
+                Stand120.ajax(saveAction, saveData).then(response => {
+                    if (response.success) {
+                        $input.addClass('saved');
+                        setTimeout(() => $input.removeClass('saved'), 1000);
+                    }
+                });
+            }
+        },
+        
+        /**
+         * Handle tab click
+         */
+        handleTabClick: function() {
+            const $btn = $(this);
+            const tabId = $btn.data('tab');
+            
+            // Update button states
+            $('.tab-btn').removeClass('active');
+            $btn.addClass('active');
+            
+            // Update content states
+            $('.tab-content').removeClass('active');
+            $(`#${tabId}`).addClass('active');
+        },
+        
+        /**
+         * Initialize tooltips
+         */
+        initTooltips: function() {
+            // Tooltips are handled via CSS
+        },
+        
+        /**
+         * Debounce function
+         */
+        debounce: function(func, wait) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        },
+        
+        /**
+         * Calculate table totals
+         */
+        calculateTableTotals: function($table) {
+            let grandTotal = 0;
+            
+            $table.find('tbody tr').each(function() {
+                const $row = $(this);
+                const price = Stand120.parseNumber($row.find('.price-cell').text());
+                const qty = parseInt($row.find('.qty-input').val()) || 0;
+                const total = price * qty;
+                
+                $row.find('.total-cell').text(Stand120.formatNumber(total));
+                grandTotal += total;
+            });
+            
+            return grandTotal;
+        }
+    };
+
+    // Initialize on document ready
+    $(document).ready(function() {
+        Stand120.init();
+    });
+
+})(jQuery);
+
+/**
+ * Take Order Module
+ */
+const TakeOrder = {
+    items: [],
+    isSubmitting: false,
+    
+    init: function() {
+        this.bindEvents();
+        this.loadMenuItems();
+    },
+    
+    bindEvents: function() {
+        $(document).on('input', '.qty-input', this.calculateTotals.bind(this));
+        $(document).on('change', 'input[name="payment_method"]', this.handlePaymentMethodChange.bind(this));
+        $(document).on('click', '#submitOrder', this.handleSubmit.bind(this));
+    },
+    
+    loadMenuItems: function() {
+        Stand120.ajax('get_menu_items').then(response => {
+            if (response.success) {
+                this.renderMenuItems(response.data.items);
+            }
+        });
+    },
+    
+    renderMenuItems: function(items) {
+        const $tbody = $('#orderTable tbody');
+        $tbody.empty();
+        
+        items.forEach(item => {
+            const row = `
+                <tr data-product-id="${item.id}">
+                    <td>${item.name}</td>
+                    <td class="price-cell formatted-number">₦${Stand120.formatNumber(item.price)}</td>
+                    <td>
+                        <input type="number" class="table-input qty-input" value="0" min="0" data-price="${item.price}">
+                    </td>
+                    <td class="total-cell formatted-number">₦0</td>
+                </tr>
+            `;
+            $tbody.append(row);
+        });
+    },
+    
+    calculateTotals: function() {
+        let subtotal = 0;
+        
+        $('#orderTable tbody tr').each(function() {
+            const $row = $(this);
+            const price = parseFloat($row.find('.qty-input').data('price')) || 0;
+            const qty = parseInt($row.find('.qty-input').val()) || 0;
+            const total = price * qty;
+            
+            $row.find('.total-cell').text('₦' + Stand120.formatNumber(total));
+            subtotal += total;
+        });
+        
+        const deliveryFee = Stand120.parseNumber($('#deliveryFee').val()) || 0;
+        const grandTotal = subtotal + deliveryFee;
+        
+        $('#subtotal').text('₦' + Stand120.formatNumber(subtotal));
+        $('#grandTotal').text('₦' + Stand120.formatNumber(grandTotal));
+    },
+    
+    handlePaymentMethodChange: function() {
+        const method = $('input[name="payment_method"]:checked').val();
+        
+        if (method === 'both') {
+            $('#cashAmount, #transferAmount').prop('disabled', false).closest('.form-group').show();
+        } else if (method === 'cash') {
+            $('#cashAmount').prop('disabled', false).closest('.form-group').show();
+            $('#transferAmount').prop('disabled', true).val('').closest('.form-group').hide();
+        } else if (method === 'transfer') {
+            $('#transferAmount').prop('disabled', false).closest('.form-group').show();
+            $('#cashAmount').prop('disabled', true).val('').closest('.form-group').hide();
+        }
+    },
+    
+    collectOrderData: function() {
+        const items = [];
+        
+        $('#orderTable tbody tr').each(function() {
+            const $row = $(this);
+            const qty = parseInt($row.find('.qty-input').val()) || 0;
+            
+            if (qty > 0) {
+                items.push({
+                    product_id: $row.data('product-id'),
+                    product_name: $row.find('td:first').text(),
+                    price: parseFloat($row.find('.qty-input').data('price')),
+                    quantity: qty,
+                    total: parseFloat($row.find('.qty-input').data('price')) * qty
+                });
+            }
+        });
+        
+        const paymentMethod = $('input[name="payment_method"]:checked').val();
+        
+        return {
+            items: JSON.stringify(items),
+            payment_method: paymentMethod,
+            cash_amount: Stand120.parseNumber($('#cashAmount').val()),
+            transfer_amount: Stand120.parseNumber($('#transferAmount').val()),
+            delivery_fee: Stand120.parseNumber($('#deliveryFee').val()),
+            payment_confirmed: $('#paymentConfirmed').is(':checked') ? 1 : 0
+        };
+    },
+    
+    handleSubmit: async function(e) {
+        e.preventDefault();
+        
+        if (this.isSubmitting) {
+            return;
+        }
+        
+        const data = this.collectOrderData();
+        const items = JSON.parse(data.items);
+        
+        // Validation
+        if (items.length === 0) {
+            Stand120.showAlert('danger', 'Please add at least one item to the order.');
+            return;
+        }
+        
+        if (!data.payment_confirmed) {
+            Stand120.showAlert('warning', 'Please confirm payment has been received before submitting.');
+            return;
+        }
+        
+        // Show confirmation modal
+        const grandTotal = Stand120.parseNumber($('#grandTotal').text().replace('₦', ''));
+        const confirmContent = `
+            <div class="order-summary">
+                <p><strong>Total Items:</strong> ${items.length}</p>
+                <p><strong>Payment Method:</strong> ${data.payment_method}</p>
+                <p><strong>Grand Total:</strong> ₦${Stand120.formatNumber(grandTotal)}</p>
+            </div>
+            <p class="mt-3">Are you sure you want to submit this order?</p>
+        `;
+        
+        const confirmed = await Stand120.showModal({
+            title: 'Confirm Order Submission',
+            content: confirmContent,
+            confirmText: 'Submit Order'
+        });
+        
+        if (!confirmed) return;
+        
+        this.isSubmitting = true;
+        $('#submitOrder').prop('disabled', true).html('<span class="loading-spinner"></span> Submitting...');
+        
+        // Check if offline
+        if (!navigator.onLine) {
+            data.offline = true;
+            Stand120.saveOfflineData('order', data);
+            Stand120.showAlert('info', 'Order saved offline. It will sync when you\'re back online.');
+            this.resetForm();
+            this.isSubmitting = false;
+            $('#submitOrder').prop('disabled', false).text('Submit Order');
+            return;
+        }
+        
+        Stand120.ajax('submit_order', data).then(response => {
+            if (response.success) {
+                Stand120.showAlert('success', 'Order submitted successfully!');
+                this.resetForm();
+            } else {
+                Stand120.showAlert('danger', response.data?.message || 'Failed to submit order.');
+            }
+        }).catch(error => {
+            Stand120.showAlert('danger', 'An error occurred. Please try again.');
+        }).finally(() => {
+            this.isSubmitting = false;
+            $('#submitOrder').prop('disabled', false).text('Submit Order');
+        });
+    },
+    
+    resetForm: function() {
+        $('.qty-input').val(0);
+        $('#deliveryFee, #cashAmount, #transferAmount').val('');
+        $('#paymentConfirmed').prop('checked', false);
+        this.calculateTotals();
+    }
+};
+
+/**
+ * Order Preparation Module
+ */
+const OrderPreparation = {
+    data: [],
+    
+    init: function() {
+        this.bindEvents();
+        this.loadData();
+    },
+    
+    bindEvents: function() {
+        $(document).on('input', '.prep-added, .prep-sold', this.handleInputChange.bind(this));
+    },
+    
+    loadData: function() {
+        const date = $('#prepDate').val() || new Date().toISOString().split('T')[0];
+        
+        Stand120.ajax('get_order_preparation', { date: date }).then(response => {
+            if (response.success) {
+                this.data = response.data.data;
+                this.renderTable();
+            }
+        });
+    },
+    
+    renderTable: function() {
+        const $tbody = $('#prepTable tbody');
+        $tbody.empty();
+        
+        const isAdmin = Stand120.config.is_admin;
+        
+        this.data.forEach(item => {
+            const row = `
+                <tr data-product-id="${item.product_id}">
+                    <td>${item.product_name}</td>
+                    <td>
+                        <input type="number" class="table-input prep-opening" 
+                            value="${item.opening}" 
+                            ${!isAdmin ? 'readonly' : ''} 
+                            data-field="opening">
+                    </td>
+                    <td>
+                        <input type="number" class="table-input prep-added auto-save-input" 
+                            value="${item.total_added}" min="0" 
+                            data-field="total_added"
+                            data-save-action="save_order_preparation">
+                    </td>
+                    <td>
+                        <input type="number" class="table-input prep-sold auto-save-input" 
+                            value="${item.total_sold}" min="0" 
+                            data-field="total_sold"
+                            data-save-action="save_order_preparation">
+                    </td>
+                    <td class="prep-closing formatted-number">${item.closing}</td>
+                </tr>
+            `;
+            $tbody.append(row);
+        });
+    },
+    
+    handleInputChange: function(e) {
+        const $input = $(e.target);
+        const $row = $input.closest('tr');
+        
+        const opening = parseFloat($row.find('.prep-opening').val()) || 0;
+        const added = parseFloat($row.find('.prep-added').val()) || 0;
+        const sold = parseFloat($row.find('.prep-sold').val()) || 0;
+        const closing = opening + added - sold;
+        
+        $row.find('.prep-closing').text(Stand120.formatNumber(closing));
+        
+        // Auto-save
+        this.saveRow($row);
+    },
+    
+    saveRow: function($row) {
+        const productId = $row.data('product-id');
+        const added = parseFloat($row.find('.prep-added').val()) || 0;
+        const sold = parseFloat($row.find('.prep-sold').val()) || 0;
+        const date = $('#prepDate').val() || new Date().toISOString().split('T')[0];
+        
+        Stand120.ajax('save_order_preparation', {
+            product_id: productId,
+            date: date,
+            total_added: added,
+            total_sold: sold
+        }).then(response => {
+            if (response.success) {
+                $row.addClass('saved');
+                setTimeout(() => $row.removeClass('saved'), 500);
+            }
+        });
+    }
+};
+
+/**
+ * Stock Inventory Module
+ */
+const StockInventory = {
+    data: [],
+    
+    init: function() {
+        this.bindEvents();
+        this.loadData();
+    },
+    
+    bindEvents: function() {
+        $(document).on('input', '.stock-used', this.handleInputChange.bind(this));
+    },
+    
+    loadData: function() {
+        const date = $('#stockDate').val() || new Date().toISOString().split('T')[0];
+        
+        Stand120.ajax('get_stock_inventory', { date: date }).then(response => {
+            if (response.success) {
+                this.data = response.data.data;
+                this.renderTable();
+            }
+        });
+    },
+    
+    renderTable: function() {
+        const $tbody = $('#stockTable tbody');
+        $tbody.empty();
+        
+        const isAdmin = Stand120.config.is_admin;
+        
+        this.data.forEach(item => {
+            const row = `
+                <tr data-product-id="${item.product_id}">
+                    <td>
+                        ${item.product_name}
+                        <span class="badge badge-${item.product_type}">${item.product_type}</span>
+                    </td>
+                    <td>
+                        <input type="number" class="table-input stock-opening" 
+                            value="${item.opening}" 
+                            ${!isAdmin ? 'readonly' : ''} 
+                            data-field="opening">
+                    </td>
+                    <td class="stock-added formatted-number">${item.added}</td>
+                    <td>
+                        <input type="number" class="table-input stock-used auto-save-input" 
+                            value="${item.used}" min="0" 
+                            data-field="used_packs"
+                            data-save-action="save_stock_inventory">
+                    </td>
+                    <td class="stock-closing formatted-number">${item.closing}</td>
+                </tr>
+            `;
+            $tbody.append(row);
+        });
+    },
+    
+    handleInputChange: function(e) {
+        const $input = $(e.target);
+        const $row = $input.closest('tr');
+        
+        const opening = parseFloat($row.find('.stock-opening').val()) || 0;
+        const added = parseFloat($row.find('.stock-added').text().replace(/,/g, '')) || 0;
+        const used = parseFloat($row.find('.stock-used').val()) || 0;
+        const closing = opening + added - used;
+        
+        $row.find('.stock-closing').text(Stand120.formatNumber(closing));
+        
+        // Auto-save
+        this.saveRow($row);
+    },
+    
+    saveRow: function($row) {
+        const productId = $row.data('product-id');
+        const used = parseFloat($row.find('.stock-used').val()) || 0;
+        const date = $('#stockDate').val() || new Date().toISOString().split('T')[0];
+        
+        Stand120.ajax('save_stock_inventory', {
+            product_id: productId,
+            date: date,
+            used_packs: used
+        });
+    }
+};
+
+/**
+ * Chopping Inventory Module
+ */
+const ChoppingInventory = {
+    data: [],
+    
+    init: function() {
+        this.bindEvents();
+        this.loadData();
+    },
+    
+    bindEvents: function() {
+        $(document).on('input', '.chop-prepared, .chop-packs, .chop-remarks', this.handleInputChange.bind(this));
+    },
+    
+    loadData: function() {
+        const date = $('#chopDate').val() || new Date().toISOString().split('T')[0];
+        
+        Stand120.ajax('get_chopping_inventory', { date: date }).then(response => {
+            if (response.success) {
+                this.data = response.data.data;
+                this.renderTable();
+            }
+        });
+    },
+    
+    renderTable: function() {
+        const $tbody = $('#chopTable tbody');
+        $tbody.empty();
+        
+        const isAdmin = Stand120.config.is_admin;
+        
+        this.data.forEach(item => {
+            const row = `
+                <tr data-product-id="${item.product_id}">
+                    <td>${item.product_name}</td>
+                    <td>
+                        <input type="number" class="table-input chop-opening" 
+                            value="${item.opening}" 
+                            ${!isAdmin ? 'readonly' : ''}>
+                    </td>
+                    <td class="chop-import formatted-number">${item.import}</td>
+                    <td>
+                        <input type="number" class="table-input chop-prepared auto-save-input" 
+                            value="${item.prepared}" min="0">
+                    </td>
+                    <td class="chop-closing formatted-number">${item.closing}</td>
+                    <td>
+                        <input type="number" class="table-input chop-packs auto-save-input" 
+                            value="${item.packs_gotten}" min="0">
+                    </td>
+                    <td>
+                        <input type="text" class="table-input chop-remarks auto-save-input" 
+                            value="${item.remarks || ''}" placeholder="Add remarks...">
+                    </td>
+                </tr>
+            `;
+            $tbody.append(row);
+        });
+    },
+    
+    handleInputChange: function(e) {
+        const $input = $(e.target);
+        const $row = $input.closest('tr');
+        
+        const opening = parseFloat($row.find('.chop-opening').val()) || 0;
+        const importVal = parseFloat($row.find('.chop-import').text().replace(/,/g, '')) || 0;
+        const prepared = parseFloat($row.find('.chop-prepared').val()) || 0;
+        const closing = opening + importVal - prepared;
+        
+        $row.find('.chop-closing').text(Stand120.formatNumber(closing));
+        
+        // Auto-save
+        this.saveRow($row);
+    },
+    
+    saveRow: function($row) {
+        const productId = $row.data('product-id');
+        const prepared = parseFloat($row.find('.chop-prepared').val()) || 0;
+        const packs = parseFloat($row.find('.chop-packs').val()) || 0;
+        const remarks = $row.find('.chop-remarks').val();
+        const date = $('#chopDate').val() || new Date().toISOString().split('T')[0];
+        
+        Stand120.ajax('save_chopping_inventory', {
+            product_id: productId,
+            date: date,
+            prepared: prepared,
+            packs_gotten: packs,
+            remarks: remarks
+        });
+    }
+};
+
+/**
+ * Import Record Module
+ */
+const ImportRecord = {
+    data: [],
+    
+    init: function() {
+        this.bindEvents();
+        this.loadData();
+    },
+    
+    bindEvents: function() {
+        $(document).on('input', '.import-qty', this.handleInputChange.bind(this));
+    },
+    
+    loadData: function() {
+        const date = $('#importDate').val() || new Date().toISOString().split('T')[0];
+        
+        Stand120.ajax('get_import_records', { date: date }).then(response => {
+            if (response.success) {
+                this.data = response.data.data;
+                this.renderTable();
+            }
+        });
+    },
+    
+    renderTable: function() {
+        const $tbody = $('#importTable tbody');
+        $tbody.empty();
+        
+        this.data.forEach(item => {
+            const statusClass = item.sync_status === 'synced' ? 'status-synced' : 
+                               item.sync_status === 'syncing' ? 'status-syncing' : 'status-pending';
+            
+            const row = `
+                <tr data-product-id="${item.product_id}">
+                    <td>
+                        ${item.product_name}
+                        <span class="badge badge-${item.product_type}">${item.product_type}</span>
+                    </td>
+                    <td>
+                        <input type="number" class="table-input import-qty auto-save-input" 
+                            value="${item.quantity}" min="0">
+                    </td>
+                    <td>
+                        <span class="status-badge ${statusClass}">
+                            <i class="fas fa-${item.sync_status === 'synced' ? 'check' : 'sync'}"></i>
+                            ${item.sync_status}
+                        </span>
+                    </td>
+                </tr>
+            `;
+            $tbody.append(row);
+        });
+    },
+    
+    handleInputChange: function(e) {
+        const $input = $(e.target);
+        const $row = $input.closest('tr');
+        
+        // Update status to syncing
+        $row.find('.status-badge')
+            .removeClass('status-synced status-pending')
+            .addClass('status-syncing')
+            .html('<i class="fas fa-sync fa-spin"></i> syncing');
+        
+        // Auto-save
+        this.saveRow($row);
+    },
+    
+    saveRow: function($row) {
+        const productId = $row.data('product-id');
+        const quantity = parseFloat($row.find('.import-qty').val()) || 0;
+        const date = $('#importDate').val() || new Date().toISOString().split('T')[0];
+        
+        Stand120.ajax('save_import_record', {
+            product_id: productId,
+            date: date,
+            quantity: quantity
+        }).then(response => {
+            if (response.success) {
+                $row.find('.status-badge')
+                    .removeClass('status-syncing status-pending')
+                    .addClass('status-synced')
+                    .html('<i class="fas fa-check"></i> synced');
+            }
+        });
+    }
+};
+
+/**
+ * Financial Summary Module
+ */
+const FinancialSummary = {
+    data: {},
+    
+    init: function() {
+        this.bindEvents();
+        this.loadData();
+    },
+    
+    bindEvents: function() {
+        $(document).on('input', '#extrasAmount, #expensesAmount', this.handleInputChange.bind(this));
+        $(document).on('blur', '#extrasRemark, #expensesRemark', this.saveData.bind(this));
+    },
+    
+    loadData: function() {
+        const date = $('#finDate').val() || new Date().toISOString().split('T')[0];
+        
+        Stand120.ajax('get_financial_summary', { date: date }).then(response => {
+            if (response.success) {
+                this.data = response.data;
+                this.renderData();
+            }
+        });
+    },
+    
+    renderData: function() {
+        const data = this.data;
+        
+        $('#totalSales').text('₦' + Stand120.formatNumber(data.total_sales));
+        $('#transferSales').text('₦' + Stand120.formatNumber(data.transfer_sales));
+        $('#cashSales').text('₦' + Stand120.formatNumber(data.cash_sales));
+        $('#deliveryFees').text('₦' + Stand120.formatNumber(data.delivery_fees));
+        $('#oldCash').text('₦' + Stand120.formatNumber(data.old_cash));
+        $('#cashLeft').text('₦' + Stand120.formatNumber(data.cash_left));
+        
+        $('#extrasAmount').val(data.extras_amount || '');
+        $('#extrasRemark').val(data.extras_remark || '');
+        $('#expensesAmount').val(data.expenses_amount || '');
+        $('#expensesRemark').val(data.expenses_remark || '');
+    },
+    
+    handleInputChange: function() {
+        this.calculateCashLeft();
+        Stand120.debounce(this.saveData.bind(this), 500)();
+    },
+    
+    calculateCashLeft: function() {
+        const cashSales = Stand120.parseNumber($('#cashSales').text().replace('₦', ''));
+        const oldCash = Stand120.parseNumber($('#oldCash').text().replace('₦', ''));
+        const extras = Stand120.parseNumber($('#extrasAmount').val());
+        const expenses = Stand120.parseNumber($('#expensesAmount').val());
+        
+        const cashLeft = (cashSales + oldCash + extras) - expenses;
+        $('#cashLeft').text('₦' + Stand120.formatNumber(cashLeft));
+    },
+    
+    saveData: function() {
+        const date = $('#finDate').val() || new Date().toISOString().split('T')[0];
+        
+        Stand120.ajax('save_financial_summary', {
+            date: date,
+            extras_amount: Stand120.parseNumber($('#extrasAmount').val()),
+            extras_remark: $('#extrasRemark').val(),
+            expenses_amount: Stand120.parseNumber($('#expensesAmount').val()),
+            expenses_remark: $('#expensesRemark').val()
+        });
+    }
+};
+
+/**
+ * Product Summary Module
+ */
+const ProductSummary = {
+    init: function() {
+        this.bindEvents();
+        this.loadData();
+    },
+    
+    bindEvents: function() {
+        $(document).on('click', '#filterBtn', this.loadData.bind(this));
+    },
+    
+    loadData: function() {
+        const dateFrom = $('#dateFrom').val() || new Date().toISOString().split('T')[0];
+        const dateTo = $('#dateTo').val() || new Date().toISOString().split('T')[0];
+        
+        Stand120.ajax('get_product_summary', {
+            date_from: dateFrom,
+            date_to: dateTo
+        }).then(response => {
+            if (response.success) {
+                this.renderSummary(response.data.summary);
+                this.renderTable(response.data.records);
+            }
+        });
+    },
+    
+    renderSummary: function(summary) {
+        $('#totalProductsSold').text(Stand120.formatNumber(summary.total_products_sold));
+        $('#totalRevenue').text('₦' + Stand120.formatNumber(summary.total_revenue));
+        $('#activeStaff').text(summary.active_staff_today);
+    },
+    
+    renderTable: function(records) {
+        const $tbody = $('#summaryTable tbody');
+        $tbody.empty();
+        
+        records.forEach(record => {
+            const row = `
+                <tr>
+                    <td>${record.time}</td>
+                    <td>${record.date}</td>
+                    <td>${record.product}</td>
+                    <td>${record.staff || '-'}</td>
+                    <td class="formatted-number">${record.quantity}</td>
+                    <td class="formatted-number">₦${Stand120.formatNumber(record.amount)}</td>
+                </tr>
+            `;
+            $tbody.append(row);
+        });
+    }
+};
+
+/**
+ * Admin Panel Module
+ */
+const AdminPanel = {
+    init: function() {
+        this.bindEvents();
+        this.loadData();
+    },
+    
+    bindEvents: function() {
+        $(document).on('click', '#addProduct', this.addProductRow.bind(this));
+        $(document).on('click', '.delete-product', this.deleteProduct.bind(this));
+        $(document).on('click', '#saveProducts', this.saveProducts.bind(this));
+        $(document).on('click', '#addStaff', this.showAddStaffModal.bind(this));
+        $(document).on('click', '.edit-staff', this.editStaff.bind(this));
+        $(document).on('click', '.delete-staff', this.deleteStaff.bind(this));
+    },
+    
+    loadData: function() {
+        Stand120.ajax('get_products').then(response => {
+            if (response.success) {
+                this.renderProducts(response.data.products);
+            }
+        });
+        
+        Stand120.ajax('get_staff').then(response => {
+            if (response.success) {
+                this.renderStaff(response.data.staff);
+            }
+        });
+    },
+    
+    renderProducts: function(products) {
+        const $tbody = $('#productsTable tbody');
+        $tbody.empty();
+        
+        products.forEach(product => {
+            const row = `
+                <tr data-id="${product.id}">
+                    <td><input type="text" class="table-input product-name" value="${product.name}"></td>
+                    <td><input type="number" class="table-input product-price" value="${product.price}"></td>
+                    <td>
+                        <select class="table-input product-type">
+                            <option value="menu" ${product.type === 'menu' ? 'selected' : ''}>Menu Item</option>
+                            <option value="fruit" ${product.type === 'fruit' ? 'selected' : ''}>Fruit</option>
+                            <option value="non_fruit" ${product.type === 'non_fruit' ? 'selected' : ''}>Non-Fruit</option>
+                        </select>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-danger delete-product"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `;
+            $tbody.append(row);
+        });
+    },
+    
+    addProductRow: function() {
+        const row = `
+            <tr data-id="new">
+                <td><input type="text" class="table-input product-name" placeholder="Product name"></td>
+                <td><input type="number" class="table-input product-price" placeholder="0"></td>
+                <td>
+                    <select class="table-input product-type">
+                        <option value="menu">Menu Item</option>
+                        <option value="fruit">Fruit</option>
+                        <option value="non_fruit">Non-Fruit</option>
+                    </select>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-danger delete-product"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>
+        `;
+        $('#productsTable tbody').append(row);
+    },
+    
+    deleteProduct: async function(e) {
+        const $row = $(e.target).closest('tr');
+        const id = $row.data('id');
+        
+        if (id === 'new') {
+            $row.remove();
+            return;
+        }
+        
+        const confirmed = await Stand120.showModal({
+            title: 'Delete Product',
+            content: 'Are you sure you want to delete this product?',
+            confirmText: 'Delete'
+        });
+        
+        if (confirmed) {
+            Stand120.ajax('delete_product', { id: id }).then(response => {
+                if (response.success) {
+                    $row.remove();
+                    Stand120.showAlert('success', 'Product deleted successfully');
+                }
+            });
+        }
+    },
+    
+    saveProducts: function() {
+        const products = [];
+        
+        $('#productsTable tbody tr').each(function() {
+            const $row = $(this);
+            products.push({
+                id: $row.data('id') === 'new' ? null : $row.data('id'),
+                name: $row.find('.product-name').val(),
+                price: $row.find('.product-price').val(),
+                type: $row.find('.product-type').val()
+            });
+        });
+        
+        Stand120.showLoading('Saving products...');
+        
+        // Save each product individually
+        const promises = products.map(product => {
+            if (product.id) {
+                return Stand120.ajax('update_product', product);
+            } else {
+                return Stand120.ajax('add_product', product);
+            }
+        });
+        
+        Promise.all(promises).then(() => {
+            Stand120.hideLoading();
+            Stand120.showAlert('success', 'Products saved successfully');
+            this.loadData();
+        }).catch(() => {
+            Stand120.hideLoading();
+            Stand120.showAlert('danger', 'Failed to save some products');
+        });
+    },
+    
+    renderStaff: function(staff) {
+        const $tbody = $('#staffTable tbody');
+        $tbody.empty();
+        
+        staff.forEach(s => {
+            const row = `
+                <tr data-id="${s.id}">
+                    <td>${s.full_name}</td>
+                    <td>${s.phone || '-'}</td>
+                    <td>${s.role}</td>
+                    <td>${s.status}</td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary edit-staff"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-sm btn-danger delete-staff"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `;
+            $tbody.append(row);
+        });
+    },
+    
+    showAddStaffModal: function() {
+        const content = `
+            <form id="staffForm">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" class="form-control" name="full_name" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <input type="text" class="form-control" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-control" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Phone</label>
+                    <input type="text" class="form-control" name="phone">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-control" name="password" required>
+                </div>
+            </form>
+        `;
+        
+        Stand120.showModal({
+            title: 'Add Staff',
+            content: content,
+            confirmText: 'Add Staff'
+        }).then(confirmed => {
+            if (confirmed) {
+                const formData = {};
+                $('#staffForm').serializeArray().forEach(item => {
+                    formData[item.name] = item.value;
+                });
+                
+                Stand120.ajax('create_staff', formData).then(response => {
+                    if (response.success) {
+                        Stand120.showAlert('success', 'Staff added successfully');
+                        this.loadData();
+                    } else {
+                        Stand120.showAlert('danger', response.data?.message || 'Failed to add staff');
+                    }
+                });
+            }
+        });
+    },
+    
+    editStaff: function(e) {
+        const $row = $(e.target).closest('tr');
+        const staffId = $row.data('id');
+        
+        // Load staff details and show edit modal
+        // Similar to showAddStaffModal but with pre-filled data
+    },
+    
+    deleteStaff: async function(e) {
+        const $row = $(e.target).closest('tr');
+        const staffId = $row.data('id');
+        
+        const confirmed = await Stand120.showModal({
+            title: 'Delete Staff',
+            content: 'Are you sure you want to delete this staff member?',
+            confirmText: 'Delete'
+        });
+        
+        if (confirmed) {
+            Stand120.ajax('delete_staff', { staff_id: staffId }).then(response => {
+                if (response.success) {
+                    $row.remove();
+                    Stand120.showAlert('success', 'Staff deleted successfully');
+                }
+            });
+        }
+    }
+};
+
+/**
+ * Login Module
+ */
+const Login = {
+    init: function() {
+        this.bindEvents();
+    },
+    
+    bindEvents: function() {
+        $(document).on('submit', '#loginForm', this.handleLogin.bind(this));
+    },
+    
+    handleLogin: function(e) {
+        e.preventDefault();
+        
+        const username = $('#username').val();
+        const password = $('#password').val();
+        
+        if (!username || !password) {
+            Stand120.showAlert('danger', 'Please enter username and password');
+            return;
+        }
+        
+        $('#loginBtn').prop('disabled', true).html('<span class="loading-spinner"></span> Logging in...');
+        
+        Stand120.ajax('login', {
+            username: username,
+            password: password
+        }).then(response => {
+            if (response.success) {
+                window.location.href = Stand120.config.home_url;
+            } else {
+                Stand120.showAlert('danger', response.data?.message || 'Login failed');
+            }
+        }).catch(() => {
+            Stand120.showAlert('danger', 'An error occurred. Please try again.');
+        }).finally(() => {
+            $('#loginBtn').prop('disabled', false).text('Login');
+        });
+    }
+};
