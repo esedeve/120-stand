@@ -8,20 +8,21 @@
     --primary-color: #8B0000;
     --primary-dark: #5C0000;
     --primary-light: #A52A2A;
-    --bg-primary: #FFF5F5;
-    --bg-secondary: #FFEAEA;
-    --bg-card: rgba(255, 245, 245, 0.9);
-    --bg-glass: rgba(139, 0, 0, 0.08);
-    --text-primary: #2D1F1F;
-    --text-secondary: rgba(45, 31, 31, 0.85);
-    --text-muted: rgba(45, 31, 31, 0.6);
-    --border-color: rgba(139, 0, 0, 0.15);
-    --border-glass: rgba(139, 0, 0, 0.2);
+    --bg-primary: #FFFFFF;
+    --bg-secondary: #FAFAFA;
+    --bg-card: rgba(255, 255, 255, 0.95);
+    --bg-glass: rgba(139, 0, 0, 0.05);
+    --text-primary: #1a1a1a;
+    --text-secondary: #333333;
+    --text-muted: #666666;
+    --text-white: #FFFFFF;
+    --border-color: rgba(139, 0, 0, 0.12);
+    --border-glass: rgba(139, 0, 0, 0.15);
     --success-color: #28a745;
     --warning-color: #ffc107;
     --danger-color: #dc3545;
     --info-color: #17a2b8;
-    --shadow-glass: 0 8px 32px 0 rgba(139, 0, 0, 0.15);
+    --shadow-glass: 0 8px 32px 0 rgba(139, 0, 0, 0.1);
     --blur-glass: blur(10px);
     --transition-fast: 0.2s ease;
     --transition-normal: 0.3s ease;
@@ -278,6 +279,7 @@
     justify-content: center;
     font-size: 1.2rem;
     font-weight: 600;
+    color: var(--text-white);
 }
 
 .staff-details h4 {
@@ -355,7 +357,7 @@
     align-items: center;
     justify-content: center;
     font-size: 1.8rem;
-    color: var(--text-primary);
+    color: var(--text-white);
 }
 
 .home-card h3 {
@@ -376,7 +378,7 @@
     gap: 8px;
     padding: 10px 20px;
     background: var(--primary-color);
-    color: var(--text-primary);
+    color: var(--text-white);
     border-radius: var(--border-radius-sm);
     font-weight: 500;
     font-size: 0.9rem;
@@ -407,7 +409,7 @@
 
 .btn-primary {
     background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
-    color: var(--text-primary);
+    color: var(--text-white);
 }
 
 .btn-primary:hover {
@@ -427,7 +429,7 @@
 
 .btn-success {
     background: var(--success-color);
-    color: var(--text-primary);
+    color: var(--text-white);
 }
 
 .btn-success:hover {
@@ -436,7 +438,7 @@
 
 .btn-danger {
     background: var(--danger-color);
-    color: var(--text-primary);
+    color: var(--text-white);
 }
 
 .btn-danger:hover {
@@ -657,6 +659,7 @@ select.form-control {
     justify-content: space-between;
     align-items: center;
     margin-top: 24px;
+    color: var(--text-white);
 }
 
 .grand-total-label {
@@ -872,6 +875,7 @@ select.form-control {
     align-items: center;
     justify-content: center;
     font-size: 1.4rem;
+    color: var(--text-white);
 }
 
 .summary-card-label {
@@ -921,7 +925,7 @@ select.form-control {
     height: 50px;
     border-radius: 50%;
     background: var(--primary-color);
-    color: var(--text-primary);
+    color: var(--text-white);
     border: none;
     cursor: pointer;
     display: flex;
@@ -963,7 +967,7 @@ select.form-control {
 }
 
 .scroll-progress-ring .progress {
-    stroke: var(--text-primary);
+    stroke: var(--primary-light);
     stroke-linecap: round;
     transform: rotate(-90deg);
     transform-origin: center;
@@ -1439,6 +1443,7 @@ select.form-control {
     justify-content: center;
     font-size: 3rem;
     margin: 0 auto 20px;
+    color: var(--text-white);
 }
 
 .profile-name {

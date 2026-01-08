@@ -92,50 +92,60 @@ include STAND120_PLUGIN_DIR . 'templates/partials/header.php';
             <i class="fas fa-credit-card"></i> Payment Details
         </h3>
         
-        <div class="payment-section">
-            <!-- Payment Method -->
-            <div class="form-group">
-                <label class="form-label">Payment Method</label>
-                <div class="payment-method-select">
-                    <label class="payment-option selected">
-                        <input type="radio" name="payment_method" value="cash" checked>
-                        <i class="fas fa-money-bill-wave"></i>
-                        <span>Cash</span>
-                    </label>
-                    <label class="payment-option">
-                        <input type="radio" name="payment_method" value="transfer">
-                        <i class="fas fa-exchange-alt"></i>
-                        <span>Transfer/Card</span>
-                    </label>
-                    <label class="payment-option">
-                        <input type="radio" name="payment_method" value="both">
-                        <i class="fas fa-coins"></i>
-                        <span>Both</span>
-                    </label>
-                </div>
-            </div>
-            
-            <!-- Cash Amount -->
-            <div class="form-group" id="cashAmountGroup">
-                <label class="form-label" for="cashAmount">Cash Amount (₦)</label>
-                <input type="text" id="cashAmount" class="form-control number-input" placeholder="0">
-            </div>
-            
-            <!-- Transfer Amount -->
-            <div class="form-group" id="transferAmountGroup" style="display: none;">
-                <label class="form-label" for="transferAmount">Transfer/Card Amount (₦)</label>
-                <input type="text" id="transferAmount" class="form-control number-input" placeholder="0" disabled>
-            </div>
-            
-            <!-- Delivery Fee -->
-            <div class="form-group">
-                <label class="form-label" for="deliveryFee">Delivery Fee (₦)</label>
-                <input type="text" id="deliveryFee" class="form-control number-input" placeholder="0">
+        <!-- Payment Method Selection -->
+        <div class="form-group">
+            <label class="form-label">Payment Method</label>
+            <div class="payment-method-select">
+                <label class="payment-option">
+                    <input type="radio" name="payment_method" value="transfer">
+                    <i class="fas fa-credit-card"></i>
+                    <span>Transfer/Card</span>
+                </label>
+                <label class="payment-option">
+                    <input type="radio" name="payment_method" value="cash">
+                    <i class="fas fa-money-bill-wave"></i>
+                    <span>Cash</span>
+                </label>
+                <label class="payment-option">
+                    <input type="radio" name="payment_method" value="both">
+                    <i class="fas fa-coins"></i>
+                    <span>Transfer/Card + Cash</span>
+                </label>
             </div>
         </div>
         
-        <!-- Payment Confirmation -->
-        <div class="confirmation-warning">
+        <!-- Cash Amount Section (Hidden by default) -->
+        <div id="cashSection" class="glass-card" style="display: none; margin-top: 16px; background: rgba(139, 0, 0, 0.03);">
+            <h4 style="color: var(--primary-color); margin-bottom: 12px;">
+                <i class="fas fa-money-bill-wave"></i> Cash Payment
+            </h4>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="cashAmount">Cash Amount (₦)</label>
+                <input type="text" id="cashAmount" class="form-control number-input" placeholder="Enter cash amount" disabled>
+            </div>
+        </div>
+        
+        <!-- Transfer Amount Section (Hidden by default) -->
+        <div id="transferSection" class="glass-card" style="display: none; margin-top: 16px; background: rgba(139, 0, 0, 0.03);">
+            <h4 style="color: var(--primary-color); margin-bottom: 12px;">
+                <i class="fas fa-credit-card"></i> Transfer/Card Payment
+            </h4>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="transferAmount">Transfer/Card Amount (₦)</label>
+                <input type="text" id="transferAmount" class="form-control number-input" placeholder="Enter transfer amount" disabled>
+            </div>
+        </div>
+        
+        <!-- Delivery Fee -->
+        <div class="form-group" style="margin-top: 20px;">
+            <label class="form-label" for="deliveryFee">
+                <i class="fas fa-motorcycle" style="color: var(--primary-color);"></i> Delivery Fee (₦)
+            </label>
+            <input type="text" id="deliveryFee" class="form-control number-input" placeholder="Enter delivery fee (optional)">
+        </div>
+        
+        <!-- Payment Confirmation (visible when Transfer/Card is selected) -->
+        <div id="confirmationSection" class="confirmation-warning" style="display: none;">
             <label class="form-check">
                 <input type="checkbox" id="paymentConfirmed">
                 <span class="form-check-label">
@@ -166,29 +176,31 @@ include STAND120_PLUGIN_DIR . 'templates/partials/header.php';
     $(document).ready(function() {
         TakeOrder.init();
         
-        // Payment method toggle
+        // Payment method toggle - enhanced version
         $('input[name="payment_method"]').on('change', function() {
             $('.payment-option').removeClass('selected');
             $(this).closest('.payment-option').addClass('selected');
             
             const method = $(this).val();
             
+            // Hide all sections first
+            $('#cashSection, #transferSection, #confirmationSection').hide();
+            $('#cashAmount, #transferAmount').prop('disabled', true).val('');
+            
             if (method === 'cash') {
-                $('#cashAmountGroup').show();
+                // Cash only - show cash section, no confirmation needed
+                $('#cashSection').show();
                 $('#cashAmount').prop('disabled', false);
-                $('#transferAmountGroup').hide();
-                $('#transferAmount').prop('disabled', true).val('');
             } else if (method === 'transfer') {
-                $('#cashAmountGroup').hide();
-                $('#cashAmount').prop('disabled', true).val('');
-                $('#transferAmountGroup').show();
-                $('#transferAmount').prop('disabled', false);
-            } else {
-                $('#cashAmountGroup').show();
-                $('#cashAmount').prop('disabled', false);
-                $('#transferAmountGroup').show();
-                $('#transferAmount').prop('disabled', false);
+                // Transfer/Card only - show confirmation checkbox
+                $('#confirmationSection').show();
+            } else if (method === 'both') {
+                // Both - show both sections and confirmation
+                $('#cashSection, #transferSection, #confirmationSection').show();
+                $('#cashAmount, #transferAmount').prop('disabled', false);
             }
+            
+            TakeOrder.calculateTotals();
         });
     });
 </script>

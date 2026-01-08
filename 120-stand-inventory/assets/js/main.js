@@ -498,16 +498,31 @@ const TakeOrder = {
     },
     
     bindEvents: function() {
-        // Use event delegation for dynamically loaded items
-        $(document).off('input.takeorder', '.qty-input');
-        $(document).on('input.takeorder', '.qty-input', () => this.calculateTotals());
+        const self = this;
         
-        $(document).off('input.takeorder', '#deliveryFee');
-        $(document).on('input.takeorder', '#deliveryFee', () => this.calculateTotals());
+        // Quantity input change - direct event binding for immediate response
+        $(document).off('input.takeorder change.takeorder keyup.takeorder', '.qty-input');
+        $(document).on('input.takeorder change.takeorder keyup.takeorder', '.qty-input', function() {
+            self.calculateTotals();
+        });
         
+        // Delivery fee input change
+        $(document).off('input.takeorder change.takeorder keyup.takeorder', '#deliveryFee');
+        $(document).on('input.takeorder change.takeorder keyup.takeorder', '#deliveryFee', function() {
+            self.calculateTotals();
+        });
+        
+        // Cash and transfer amount change
+        $(document).off('input.takeorder change.takeorder keyup.takeorder', '#cashAmount, #transferAmount');
+        $(document).on('input.takeorder change.takeorder keyup.takeorder', '#cashAmount, #transferAmount', function() {
+            self.calculateTotals();
+        });
+        
+        // Payment method change
         $(document).off('change.takeorder', 'input[name="payment_method"]');
         $(document).on('change.takeorder', 'input[name="payment_method"]', this.handlePaymentMethodChange.bind(this));
         
+        // Submit button
         $(document).off('click.takeorder', '#submitOrder');
         $(document).on('click.takeorder', '#submitOrder', this.handleSubmit.bind(this));
     },
@@ -544,10 +559,12 @@ const TakeOrder = {
         
         $('#orderTable tbody tr').each(function() {
             const $row = $(this);
-            const price = parseFloat($row.find('.qty-input').data('price')) || 0;
+            const priceAttr = $row.find('.qty-input').data('price');
+            const price = parseFloat(priceAttr) || 0;
             const qty = parseInt($row.find('.qty-input').val()) || 0;
             const total = price * qty;
             
+            // Update the total cell immediately
             $row.find('.total-cell').text('₦' + Stand120.formatNumber(total));
             subtotal += total;
         });
@@ -557,21 +574,32 @@ const TakeOrder = {
         const deliveryFee = parseFloat(deliveryFeeVal.toString().replace(/,/g, '')) || 0;
         const grandTotal = subtotal + deliveryFee;
         
+        // Update display immediately
         $('#subtotal').text('₦' + Stand120.formatNumber(subtotal));
         $('#grandTotal').text('₦' + Stand120.formatNumber(grandTotal));
+        
+        // Log for debugging
+        console.log('Calculations updated - Subtotal:', subtotal, 'Delivery:', deliveryFee, 'Grand Total:', grandTotal);
     },
     
     handlePaymentMethodChange: function() {
         const method = $('input[name="payment_method"]:checked').val();
         
+        // Hide all payment sections first
+        $('#cashSection, #transferSection, #confirmationSection').hide();
+        $('#cashAmount, #transferAmount').prop('disabled', true);
+        
         if (method === 'both') {
-            $('#cashAmount, #transferAmount').prop('disabled', false).closest('.form-group').show();
+            // Both - show both sections and confirmation
+            $('#cashSection, #transferSection, #confirmationSection').show();
+            $('#cashAmount, #transferAmount').prop('disabled', false);
         } else if (method === 'cash') {
-            $('#cashAmount').prop('disabled', false).closest('.form-group').show();
-            $('#transferAmount').prop('disabled', true).val('').closest('.form-group').hide();
+            // Cash only - show cash section
+            $('#cashSection').show();
+            $('#cashAmount').prop('disabled', false);
         } else if (method === 'transfer') {
-            $('#transferAmount').prop('disabled', false).closest('.form-group').show();
-            $('#cashAmount').prop('disabled', true).val('').closest('.form-group').hide();
+            // Transfer/Card - show confirmation
+            $('#confirmationSection').show();
         }
     },
     
@@ -614,6 +642,7 @@ const TakeOrder = {
         
         const data = this.collectOrderData();
         const items = JSON.parse(data.items);
+        const paymentMethod = data.payment_method;
         
         // Validation
         if (items.length === 0) {
@@ -621,17 +650,21 @@ const TakeOrder = {
             return;
         }
         
-        if (!data.payment_confirmed) {
+        // Check if confirmation is needed (for transfer or both)
+        if ((paymentMethod === 'transfer' || paymentMethod === 'both') && !data.payment_confirmed) {
             Stand120.showAlert('warning', 'Please confirm payment has been received before submitting.');
             return;
         }
         
         // Show confirmation modal
         const grandTotal = Stand120.parseNumber($('#grandTotal').text().replace('₦', ''));
+        let paymentDisplay = paymentMethod === 'both' ? 'Transfer/Card + Cash' : 
+                            (paymentMethod === 'transfer' ? 'Transfer/Card' : 'Cash');
+        
         const confirmContent = `
             <div class="order-summary">
                 <p><strong>Total Items:</strong> ${items.length}</p>
-                <p><strong>Payment Method:</strong> ${data.payment_method}</p>
+                <p><strong>Payment Method:</strong> ${paymentDisplay}</p>
                 <p><strong>Grand Total:</strong> ₦${Stand120.formatNumber(grandTotal)}</p>
             </div>
             <p class="mt-3">Are you sure you want to submit this order?</p>
@@ -655,7 +688,7 @@ const TakeOrder = {
             Stand120.showAlert('info', 'Order saved offline. It will sync when you\'re back online.');
             this.resetForm();
             this.isSubmitting = false;
-            $('#submitOrder').prop('disabled', false).text('Submit Order');
+            $('#submitOrder').prop('disabled', false).html('<i class="fas fa-check-circle"></i> Submit Order');
             return;
         }
         
@@ -678,6 +711,9 @@ const TakeOrder = {
         $('.qty-input').val(0);
         $('#deliveryFee, #cashAmount, #transferAmount').val('');
         $('#paymentConfirmed').prop('checked', false);
+        $('input[name="payment_method"]').prop('checked', false);
+        $('.payment-option').removeClass('selected');
+        $('#cashSection, #transferSection, #confirmationSection').hide();
         this.calculateTotals();
     }
 };
@@ -694,12 +730,13 @@ const OrderPreparation = {
     },
     
     bindEvents: function() {
-        // Use namespaced events and arrow functions to preserve 'this' context
-        $(document).off('input.orderprep', '.prep-added, .prep-sold');
-        $(document).on('input.orderprep', '.prep-added, .prep-sold', (e) => this.handleInputChange(e));
+        const self = this;
         
-        $(document).off('input.orderprep', '.prep-opening');
-        $(document).on('input.orderprep', '.prep-opening', (e) => this.handleInputChange(e));
+        // Real-time calculation on input change - using multiple events for responsiveness
+        $(document).off('input.orderprep change.orderprep keyup.orderprep', '.prep-added, .prep-sold, .prep-opening');
+        $(document).on('input.orderprep change.orderprep keyup.orderprep', '.prep-added, .prep-sold, .prep-opening', function(e) {
+            self.handleInputChange(e);
+        });
     },
     
     loadData: function() {
@@ -767,7 +804,11 @@ const OrderPreparation = {
         const sold = parseFloat($row.find('.prep-sold').val()) || 0;
         const closing = opening + added - sold;
         
+        // Update closing value immediately
         $row.find('.prep-closing').text(Stand120.formatNumber(closing));
+        
+        // Log for debugging
+        console.log('Order Prep Calculation - Opening:', opening, '+ Added:', added, '- Sold:', sold, '= Closing:', closing);
         
         // Auto-save with debounce
         clearTimeout($row.data('saveTimeout'));
@@ -806,11 +847,13 @@ const StockInventory = {
     },
     
     bindEvents: function() {
-        $(document).off('input.stockinv', '.stock-used');
-        $(document).on('input.stockinv', '.stock-used', (e) => this.handleInputChange(e));
+        const self = this;
         
-        $(document).off('input.stockinv', '.stock-opening');
-        $(document).on('input.stockinv', '.stock-opening', (e) => this.handleInputChange(e));
+        // Real-time calculation on input change
+        $(document).off('input.stockinv change.stockinv keyup.stockinv', '.stock-used, .stock-opening');
+        $(document).on('input.stockinv change.stockinv keyup.stockinv', '.stock-used, .stock-opening', function(e) {
+            self.handleInputChange(e);
+        });
     },
     
     loadData: function() {
@@ -877,7 +920,11 @@ const StockInventory = {
         const used = parseFloat($row.find('.stock-used').val()) || 0;
         const closing = opening + added - used;
         
+        // Update closing value immediately
         $row.find('.stock-closing').text(Stand120.formatNumber(closing));
+        
+        // Log for debugging
+        console.log('Stock Calculation - Opening:', opening, '+ Added:', added, '- Used:', used, '= Closing:', closing);
         
         // Auto-save with debounce
         clearTimeout($row.data('saveTimeout'));
@@ -909,11 +956,13 @@ const ChoppingInventory = {
     },
     
     bindEvents: function() {
-        $(document).off('input.chopinv', '.chop-prepared, .chop-packs, .chop-remarks');
-        $(document).on('input.chopinv', '.chop-prepared, .chop-packs, .chop-remarks', (e) => this.handleInputChange(e));
+        const self = this;
         
-        $(document).off('input.chopinv', '.chop-opening');
-        $(document).on('input.chopinv', '.chop-opening', (e) => this.handleInputChange(e));
+        // Real-time calculation on input change
+        $(document).off('input.chopinv change.chopinv keyup.chopinv', '.chop-prepared, .chop-packs, .chop-remarks, .chop-opening');
+        $(document).on('input.chopinv change.chopinv keyup.chopinv', '.chop-prepared, .chop-packs, .chop-remarks, .chop-opening', function(e) {
+            self.handleInputChange(e);
+        });
     },
     
     loadData: function() {
@@ -983,7 +1032,11 @@ const ChoppingInventory = {
         const prepared = parseFloat($row.find('.chop-prepared').val()) || 0;
         const closing = opening + importVal - prepared;
         
+        // Update closing value immediately
         $row.find('.chop-closing').text(Stand120.formatNumber(closing));
+        
+        // Log for debugging
+        console.log('Chopping Calculation - Opening:', opening, '+ Import:', importVal, '- Prepared:', prepared, '= Closing:', closing);
         
         // Auto-save with debounce
         clearTimeout($row.data('saveTimeout'));
@@ -1110,11 +1163,20 @@ const FinancialSummary = {
     },
     
     bindEvents: function() {
-        $(document).off('input.finsummary', '#extrasAmount, #expensesAmount');
-        $(document).on('input.finsummary', '#extrasAmount, #expensesAmount', () => this.handleInputChange());
+        const self = this;
         
-        $(document).off('input.finsummary', '#extrasRemark, #expensesRemark');
-        $(document).on('input.finsummary', '#extrasRemark, #expensesRemark', () => this.debouncedSave());
+        // Real-time calculation on extras and expenses input
+        $(document).off('input.finsummary change.finsummary keyup.finsummary', '#extrasAmount, #expensesAmount');
+        $(document).on('input.finsummary change.finsummary keyup.finsummary', '#extrasAmount, #expensesAmount', function() {
+            self.calculateCashLeft();
+            self.debouncedSave();
+        });
+        
+        // Auto-save for remarks
+        $(document).off('input.finsummary change.finsummary', '#extrasRemark, #expensesRemark');
+        $(document).on('input.finsummary change.finsummary', '#extrasRemark, #expensesRemark', function() {
+            self.debouncedSave();
+        });
     },
     
     debouncedSave: function() {
@@ -1169,7 +1231,12 @@ const FinancialSummary = {
         const expenses = parseFloat(expensesVal.toString().replace(/,/g, '')) || 0;
         
         const cashLeft = (cashSales + oldCash + extras) - expenses;
+        
+        // Update cash left immediately
         $('#cashLeft').text('₦' + Stand120.formatNumber(cashLeft));
+        
+        // Log for debugging
+        console.log('Financial Calculation - Cash Sales:', cashSales, '+ Old Cash:', oldCash, '+ Extras:', extras, '- Expenses:', expenses, '= Cash Left:', cashLeft);
     },
     
     saveData: function() {
