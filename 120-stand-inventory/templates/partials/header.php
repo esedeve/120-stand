@@ -36,8 +36,8 @@ $current_page = get_query_var('stand120_page');
     <link rel="stylesheet" href="<?php echo STAND120_PLUGIN_URL; ?>assets/css/style.css?v=<?php echo STAND120_VERSION; ?>">
     
     <!-- Favicon -->
-    <link rel="icon" type="image/webp" href="<?php echo STAND120_PLUGIN_URL; ?>assets/images/logo.webp">
-    <link rel="apple-touch-icon" href="<?php echo STAND120_PLUGIN_URL; ?>assets/images/logo.webp">
+    <link rel="icon" type="image/png" href="<?php echo STAND120_PLUGIN_URL; ?>assets/images/logo.png">
+    <link rel="apple-touch-icon" href="<?php echo STAND120_PLUGIN_URL; ?>assets/images/logo.png">
     
     <?php wp_head(); ?>
 </head>
@@ -50,7 +50,7 @@ $current_page = get_query_var('stand120_page');
     <!-- Header -->
     <header class="stand120-header">
         <a href="<?php echo home_url('/120-stand/'); ?>" class="stand120-logo">
-            <img src="<?php echo STAND120_PLUGIN_URL; ?>assets/images/logo.webp" alt="120 Stand">
+            <img src="<?php echo STAND120_PLUGIN_URL; ?>assets/images/logo.png" alt="120 Stand">
             <span class="stand120-logo-text">120 Stand</span>
         </a>
         
@@ -87,7 +87,7 @@ $current_page = get_query_var('stand120_page');
     <!-- Mobile Sidebar -->
     <aside class="mobile-sidebar">
         <a href="<?php echo home_url('/120-stand/'); ?>" class="stand120-logo">
-            <img src="<?php echo STAND120_PLUGIN_URL; ?>assets/images/logo.webp" alt="120 Stand">
+            <img src="<?php echo STAND120_PLUGIN_URL; ?>assets/images/logo.png" alt="120 Stand">
             <span class="stand120-logo-text">120 Stand</span>
         </a>
         

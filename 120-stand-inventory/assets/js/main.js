@@ -1489,7 +1489,7 @@ const Login = {
     handleLogin: function(e) {
         e.preventDefault();
         
-        const username = $('#username').val();
+        const username = $('#username').val().trim();
         const password = $('#password').val();
         
         if (!username || !password) {
@@ -1504,14 +1504,17 @@ const Login = {
             password: password
         }).then(response => {
             if (response.success) {
-                window.location.href = Stand120.config.home_url;
+                // Small delay to ensure cookies are properly set before redirect
+                setTimeout(function() {
+                    window.location.href = Stand120.config.home_url || '/120-stand/';
+                }, 300);
             } else {
                 Stand120.showAlert('danger', response.data?.message || 'Login failed');
+                $('#loginBtn').prop('disabled', false).html('<i class="fas fa-sign-in-alt"></i> Login');
             }
         }).catch(() => {
             Stand120.showAlert('danger', 'An error occurred. Please try again.');
-        }).finally(() => {
-            $('#loginBtn').prop('disabled', false).text('Login');
+            $('#loginBtn').prop('disabled', false).html('<i class="fas fa-sign-in-alt"></i> Login');
         });
     }
 };

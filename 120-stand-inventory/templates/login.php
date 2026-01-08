@@ -33,14 +33,14 @@ if (Stand120_Auth::is_logged_in()) {
     <link rel="stylesheet" href="<?php echo STAND120_PLUGIN_URL; ?>assets/css/style.css?v=<?php echo STAND120_VERSION; ?>">
     
     <!-- Favicon -->
-    <link rel="icon" type="image/webp" href="<?php echo STAND120_PLUGIN_URL; ?>assets/images/logo.webp">
+    <link rel="icon" type="image/png" href="<?php echo STAND120_PLUGIN_URL; ?>assets/images/logo.png">
     
     <?php wp_head(); ?>
 </head>
 <body class="stand120-app stand120-login-page">
     <div class="login-container">
         <div class="login-card glass-card">
-            <img src="<?php echo STAND120_PLUGIN_URL; ?>assets/images/logo.webp" alt="120 Stand" class="login-logo">
+            <img src="<?php echo STAND120_PLUGIN_URL; ?>assets/images/logo.png" alt="120 Stand" class="login-logo">
             <h1 class="login-title">120 Stand</h1>
             <p class="login-subtitle">Inventory Management System</p>
             

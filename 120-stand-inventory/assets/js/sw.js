@@ -15,7 +15,7 @@ const CACHE_FILES = [
     '/120-stand/login/',
     '/wp-content/plugins/120-stand-inventory/assets/css/style.css',
     '/wp-content/plugins/120-stand-inventory/assets/js/main.js',
-    '/wp-content/plugins/120-stand-inventory/assets/images/logo.webp'
+    '/wp-content/plugins/120-stand-inventory/assets/images/logo.png'
 ];
 
 // Install event
@@ -145,8 +145,8 @@ self.addEventListener('push', (event) => {
         const data = event.data.json();
         self.registration.showNotification(data.title, {
             body: data.body,
-            icon: '/wp-content/plugins/120-stand-inventory/assets/images/logo.webp',
-            badge: '/wp-content/plugins/120-stand-inventory/assets/images/logo.webp'
+            icon: '/wp-content/plugins/120-stand-inventory/assets/images/logo.png',
+            badge: '/wp-content/plugins/120-stand-inventory/assets/images/logo.png'
         });
     }
 });
