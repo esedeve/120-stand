@@ -22,8 +22,18 @@ class Stand120_Take_Order {
             return array('success' => false, 'message' => 'Staff not found');
         }
         
-        // Validate items
-        $items = isset($data['items']) ? (is_array($data['items']) ? $data['items'] : json_decode(stripslashes($data['items']), true)) : array();
+        // Validate and parse items
+        $items = array();
+        if (isset($data['items'])) {
+            if (is_array($data['items'])) {
+                $items = $data['items'];
+            } elseif (is_string($data['items'])) {
+                $decoded = json_decode(stripslashes($data['items']), true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $items = $decoded;
+                }
+            }
+        }
         
         if (empty($items)) {
             return array('success' => false, 'message' => 'No items in order');

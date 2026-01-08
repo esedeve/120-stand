@@ -1,9 +1,12 @@
 /**
  * 120 Stand Inventory - Service Worker
  * Enables offline functionality
+ * Version: 1.0.0
  */
 
-const CACHE_NAME = 'stand120-v1.0.0';
+// Cache version - update this when deploying new versions
+const CACHE_VERSION = '1.0.0';
+const CACHE_NAME = 'stand120-v' + CACHE_VERSION;
 const OFFLINE_URL = '/120-stand/offline/';
 
 // Files to cache

@@ -659,7 +659,7 @@ const TakeOrder = {
             Stand120.showAlert('danger', 'An error occurred. Please try again.');
         }).finally(() => {
             this.isSubmitting = false;
-            $('#submitOrder').prop('disabled', false).text('Submit Order');
+            $('#submitOrder').prop('disabled', false).html('<i class="fas fa-check-circle"></i> Submit Order');
         });
     },
     

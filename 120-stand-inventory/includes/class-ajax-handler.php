@@ -17,6 +17,7 @@ class Stand120_Ajax_Handler {
         // Verify nonce
         if (!wp_verify_nonce($_POST['nonce'] ?? '', 'stand120_nonce')) {
             wp_send_json_error(array('message' => 'Security check failed'));
+            return;
         }
         
         $action = sanitize_text_field($_POST['stand120_action'] ?? '');

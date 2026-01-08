@@ -372,14 +372,27 @@ class Stand120_Database {
         
         $staff_id = Stand120_Auth::get_current_staff_id();
         
+        // Get client IP address safely
+        $ip_address = '';
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $ip_list = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+            $ip_address = trim($ip_list[0]);
+        } elseif (!empty($_SERVER['HTTP_X_REAL_IP'])) {
+            $ip_address = $_SERVER['HTTP_X_REAL_IP'];
+        } elseif (!empty($_SERVER['REMOTE_ADDR'])) {
+            $ip_address = $_SERVER['REMOTE_ADDR'];
+        }
+        // Sanitize IP address
+        $ip_address = filter_var($ip_address, FILTER_VALIDATE_IP) ? $ip_address : '';
+        
         $wpdb->insert($table, array(
             'staff_id' => $staff_id,
             'action' => $action,
             'table_name' => $table_name,
             'record_id' => $record_id,
-            'old_value' => is_array($old_value) ? json_encode($old_value) : $old_value,
-            'new_value' => is_array($new_value) ? json_encode($new_value) : $new_value,
-            'ip_address' => $_SERVER['REMOTE_ADDR'] ?? ''
+            'old_value' => is_array($old_value) ? wp_json_encode($old_value) : $old_value,
+            'new_value' => is_array($new_value) ? wp_json_encode($new_value) : $new_value,
+            'ip_address' => $ip_address
         ));
     }
 }

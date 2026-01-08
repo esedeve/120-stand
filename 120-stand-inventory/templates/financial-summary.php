@@ -29,7 +29,7 @@ include STAND120_PLUGIN_DIR . 'templates/partials/header.php';
     <div class="datetime-display">
         <div class="date-display">
             <i class="fas fa-calendar-alt"></i>
-            <span class="date-text"><?php echo date('l, F j, Y'); ?></span>
+            <span class="date-text"><?php echo date_i18n('l, F j, Y'); ?></span>
         </div>
         <div class="time-display">
             <i class="fas fa-clock"></i>
