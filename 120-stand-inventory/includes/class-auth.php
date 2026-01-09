@@ -77,30 +77,33 @@ class Stand120_Auth {
         $table = $wpdb->prefix . 'stand120_staff';
         $user_id = get_current_user_id();
         
+        // First try to get any existing staff record (active or inactive)
         $staff = $wpdb->get_row($wpdb->prepare(
-            "SELECT id FROM $table WHERE user_id = %d AND status = 'active'",
+            "SELECT id, status FROM $table WHERE user_id = %d",
             $user_id
         ));
         
         if ($staff) {
+            // If staff exists but is inactive, reactivate it
+            if ($staff->status !== 'active') {
+                $wpdb->update($table, array('status' => 'active'), array('id' => $staff->id));
+            }
             return $staff->id;
         }
         
-        // Auto-create staff record for any logged-in user who has access
+        // Auto-create staff record for any logged-in user
         $user = wp_get_current_user();
         $is_admin = in_array('administrator', (array) $user->roles);
         
-        $wpdb->insert($table, array(
+        $result = $wpdb->insert($table, array(
             'user_id' => $user_id,
-            'full_name' => $user->display_name,
+            'full_name' => $user->display_name ?: $user->user_login,
             'role' => $is_admin ? 'admin' : 'staff',
             'status' => 'active'
         ));
         
-        $new_id = $wpdb->insert_id;
-        
-        if ($new_id) {
-            return $new_id;
+        if ($result !== false) {
+            return $wpdb->insert_id;
         }
         
         return 0;

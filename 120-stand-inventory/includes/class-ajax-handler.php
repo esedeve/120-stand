@@ -313,8 +313,9 @@ class Stand120_Ajax_Handler {
      * Save order preparation
      */
     private static function save_order_preparation() {
-        if (!Stand120_Auth::is_logged_in()) {
+        if (!is_user_logged_in()) {
             wp_send_json_error(array('message' => 'Please login to continue'));
+            return;
         }
         
         $result = Stand120_Order_Preparation::save($_POST);
@@ -390,8 +391,9 @@ class Stand120_Ajax_Handler {
      * Save stock inventory
      */
     private static function save_stock_inventory() {
-        if (!Stand120_Auth::is_logged_in()) {
+        if (!is_user_logged_in()) {
             wp_send_json_error(array('message' => 'Please login to continue'));
+            return;
         }
         
         $result = Stand120_Stock_Inventory::save($_POST);
@@ -432,8 +434,9 @@ class Stand120_Ajax_Handler {
      * Save chopping inventory
      */
     private static function save_chopping_inventory() {
-        if (!Stand120_Auth::is_logged_in()) {
+        if (!is_user_logged_in()) {
             wp_send_json_error(array('message' => 'Please login to continue'));
+            return;
         }
         
         $result = Stand120_Chopping_Inventory::save($_POST);
@@ -474,8 +477,9 @@ class Stand120_Ajax_Handler {
      * Save import record
      */
     private static function save_import_record() {
-        if (!Stand120_Auth::is_logged_in()) {
+        if (!is_user_logged_in()) {
             wp_send_json_error(array('message' => 'Please login to continue'));
+            return;
         }
         
         $result = Stand120_Import_Record::save($_POST);
@@ -516,8 +520,9 @@ class Stand120_Ajax_Handler {
      * Save financial summary
      */
     private static function save_financial_summary() {
-        if (!Stand120_Auth::is_logged_in()) {
+        if (!is_user_logged_in()) {
             wp_send_json_error(array('message' => 'Please login to continue'));
+            return;
         }
         
         $result = Stand120_Financial_Summary::save($_POST);
@@ -574,8 +579,9 @@ class Stand120_Ajax_Handler {
      * Sync offline data
      */
     private static function sync_offline_data() {
-        if (!Stand120_Auth::is_logged_in()) {
+        if (!is_user_logged_in()) {
             wp_send_json_error(array('message' => 'Please login to continue'));
+            return;
         }
         
         $data = json_decode(stripslashes($_POST['offline_data'] ?? '[]'), true);
