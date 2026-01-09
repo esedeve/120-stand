@@ -26,7 +26,13 @@ class Stand120_Auth {
         }
         
         $user = wp_get_current_user();
-        return $user->has_cap('stand120_access') || $user->has_cap('administrator');
+        
+        // Allow WordPress administrators always
+        if (in_array('administrator', (array) $user->roles)) {
+            return true;
+        }
+        
+        return $user->has_cap('stand120_access');
     }
     
     /**
@@ -38,7 +44,13 @@ class Stand120_Auth {
         }
         
         $user = wp_get_current_user();
-        return $user->has_cap('stand120_admin') || $user->has_cap('administrator');
+        
+        // Allow WordPress administrators always
+        if (in_array('administrator', (array) $user->roles)) {
+            return true;
+        }
+        
+        return $user->has_cap('stand120_admin');
     }
     
     /**
@@ -62,15 +74,21 @@ class Stand120_Auth {
             return $staff->id;
         }
         
-        // If no staff record, create one for admins
-        if (current_user_can('administrator')) {
-            $user = wp_get_current_user();
-            $wpdb->insert($table, array(
-                'user_id' => $user_id,
-                'full_name' => $user->display_name,
-                'role' => 'admin'
-            ));
-            return $wpdb->insert_id;
+        // Auto-create staff record for any logged-in user who has access
+        $user = wp_get_current_user();
+        $is_admin = in_array('administrator', (array) $user->roles);
+        
+        $wpdb->insert($table, array(
+            'user_id' => $user_id,
+            'full_name' => $user->display_name,
+            'role' => $is_admin ? 'admin' : 'staff',
+            'status' => 'active'
+        ));
+        
+        $new_id = $wpdb->insert_id;
+        
+        if ($new_id) {
+            return $new_id;
         }
         
         return 0;

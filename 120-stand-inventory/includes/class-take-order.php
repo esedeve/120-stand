@@ -16,15 +16,20 @@ class Stand120_Take_Order {
     public static function submit_order($data) {
         global $wpdb;
         
+        // First, ensure user is logged in
+        if (!is_user_logged_in()) {
+            return array('success' => false, 'message' => 'User is not logged in. Please refresh the page and login again.');
+        }
+        
         $staff_id = Stand120_Auth::get_current_staff_id();
         
-        // If staff_id is 0, try to create staff record for current user
-        if (!$staff_id && is_user_logged_in()) {
+        // If staff_id is still 0, try to create one directly
+        if (!$staff_id) {
             $user_id = get_current_user_id();
             $user = wp_get_current_user();
             $staff_table = $wpdb->prefix . 'stand120_staff';
             
-            // Check if staff record exists but might be inactive
+            // Check if staff record exists (maybe inactive)
             $existing = $wpdb->get_row($wpdb->prepare(
                 "SELECT id FROM $staff_table WHERE user_id = %d",
                 $user_id
@@ -36,10 +41,12 @@ class Stand120_Take_Order {
                 $wpdb->update($staff_table, array('status' => 'active'), array('id' => $staff_id));
             } else {
                 // Create new staff record
+                $is_admin = in_array('administrator', (array) $user->roles);
                 $result = $wpdb->insert($staff_table, array(
                     'user_id' => $user_id,
                     'full_name' => $user->display_name,
-                    'role' => current_user_can('administrator') ? 'admin' : 'staff'
+                    'role' => $is_admin ? 'admin' : 'staff',
+                    'status' => 'active'
                 ));
                 if ($result) {
                     $staff_id = $wpdb->insert_id;
@@ -48,7 +55,7 @@ class Stand120_Take_Order {
         }
         
         if (!$staff_id) {
-            return array('success' => false, 'message' => 'Staff not found. Please login again.');
+            return array('success' => false, 'message' => 'Could not identify staff member. Please logout and login again.');
         }
         
         // Validate and parse items

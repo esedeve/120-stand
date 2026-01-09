@@ -258,8 +258,16 @@ class Stand120_Ajax_Handler {
      * Submit order
      */
     private static function submit_order() {
+        // Check if user is logged into WordPress at all
+        if (!is_user_logged_in()) {
+            wp_send_json_error(array('message' => 'Session expired. Please refresh the page and login again.'));
+            return;
+        }
+        
+        // Check if user has access to the inventory system
         if (!Stand120_Auth::is_logged_in()) {
-            wp_send_json_error(array('message' => 'Please login to continue'));
+            wp_send_json_error(array('message' => 'You do not have permission to access this system. Please contact an administrator.'));
+            return;
         }
         
         $result = Stand120_Take_Order::submit_order($_POST);
