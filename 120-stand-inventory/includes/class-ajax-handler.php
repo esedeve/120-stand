@@ -267,11 +267,8 @@ class Stand120_Ajax_Handler {
             return;
         }
         
-        // Check if user has access to the inventory system
-        if (!Stand120_Auth::is_logged_in()) {
-            wp_send_json_error(array('message' => 'You do not have permission to access this system. Please contact an administrator.'));
-            return;
-        }
+        // Skip the Stand120 logged in check - just use WordPress login status
+        // This ensures the system works even if the staff record doesn't exist yet
         
         $result = Stand120_Take_Order::submit_order($_POST);
         
