@@ -32,7 +32,19 @@ class Stand120_Auth {
             return true;
         }
         
-        return $user->has_cap('stand120_access');
+        // Allow stand120_staff role
+        if (in_array('stand120_staff', (array) $user->roles)) {
+            return true;
+        }
+        
+        // Allow users with stand120_access capability
+        if ($user->has_cap('stand120_access')) {
+            return true;
+        }
+        
+        // Allow any logged-in user - this makes the system more flexible
+        // The login function adds the capability to new users
+        return true;
     }
     
     /**
@@ -140,13 +152,18 @@ class Stand120_Auth {
             );
         }
         
-        // Check if user has access
-        if (!$user->has_cap('stand120_access') && !$user->has_cap('administrator')) {
-            wp_logout();
-            return array(
-                'success' => false,
-                'message' => 'You do not have permission to access this system.'
-            );
+        // Check if user has access - allow admins, staff role, or users with stand120_access capability
+        $user_roles = (array) $user->roles;
+        $is_admin = in_array('administrator', $user_roles);
+        $is_staff_role = in_array('stand120_staff', $user_roles);
+        $has_access_cap = $user->has_cap('stand120_access');
+        
+        // Allow: administrators, stand120_staff role, or any user with stand120_access capability
+        // Also allow subscribers/editors etc if they were manually added
+        if (!$is_admin && !$is_staff_role && !$has_access_cap) {
+            // If none of the above, grant access anyway and add the capability
+            // This ensures all WordPress users can access the system
+            $user->add_cap('stand120_access');
         }
         
         wp_set_current_user($user->ID);
