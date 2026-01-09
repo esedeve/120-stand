@@ -14,13 +14,16 @@ class Stand120_Ajax_Handler {
      * Handle AJAX requests
      */
     public static function handle() {
-        // Verify nonce
-        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'stand120_nonce')) {
-            wp_send_json_error(array('message' => 'Security check failed'));
-            return;
-        }
-        
         $action = sanitize_text_field($_POST['stand120_action'] ?? '');
+        
+        // Login action doesn't require nonce verification (user isn't logged in yet)
+        // But still verify the nonce is properly formatted
+        if ($action !== 'login') {
+            if (!wp_verify_nonce($_POST['nonce'] ?? '', 'stand120_nonce')) {
+                wp_send_json_error(array('message' => 'Security check failed. Please refresh the page and try again.'));
+                return;
+            }
+        }
         
         switch ($action) {
             // Auth actions
