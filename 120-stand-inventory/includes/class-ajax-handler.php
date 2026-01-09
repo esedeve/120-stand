@@ -203,32 +203,55 @@ class Stand120_Ajax_Handler {
      * Add product
      */
     private static function add_product() {
-        if (!Stand120_Auth::is_admin()) {
-            wp_send_json_error(array('message' => 'Unauthorized'));
+        // Check admin using WordPress directly to avoid any issues
+        if (!current_user_can('administrator')) {
+            wp_send_json_error(array('message' => 'Unauthorized - Admin access required'));
+            return;
         }
         
         $data = array(
             'name' => sanitize_text_field($_POST['name'] ?? ''),
             'price' => floatval($_POST['price'] ?? 0),
             'type' => sanitize_text_field($_POST['type'] ?? 'menu'),
-            'unit' => sanitize_text_field($_POST['unit'] ?? 'piece')
+            'unit' => sanitize_text_field($_POST['unit'] ?? 'piece'),
+            'status' => 'active'
         );
         
-        Stand120_Database::add_product($data);
+        if (empty($data['name'])) {
+            wp_send_json_error(array('message' => 'Product name is required'));
+            return;
+        }
+        
+        $result = Stand120_Database::add_product($data);
+        
+        if ($result === false) {
+            global $wpdb;
+            wp_send_json_error(array('message' => 'Failed to add product: ' . $wpdb->last_error));
+            return;
+        }
+        
         Stand120_Database::log_activity('add_product', 'stand120_products', null, null, $data);
         
-        wp_send_json_success(array('message' => 'Product added successfully'));
+        wp_send_json_success(array('message' => 'Product added successfully', 'product_id' => $result));
     }
     
     /**
      * Update product
      */
     private static function update_product() {
-        if (!Stand120_Auth::is_admin()) {
-            wp_send_json_error(array('message' => 'Unauthorized'));
+        // Check admin using WordPress directly
+        if (!current_user_can('administrator')) {
+            wp_send_json_error(array('message' => 'Unauthorized - Admin access required'));
+            return;
         }
         
         $id = intval($_POST['id'] ?? 0);
+        
+        if (!$id) {
+            wp_send_json_error(array('message' => 'Product ID is required'));
+            return;
+        }
+        
         $data = array(
             'name' => sanitize_text_field($_POST['name'] ?? ''),
             'price' => floatval($_POST['price'] ?? 0),
@@ -236,7 +259,7 @@ class Stand120_Ajax_Handler {
         );
         
         $old = Stand120_Database::get_product($id);
-        Stand120_Database::update_product($id, $data);
+        $result = Stand120_Database::update_product($id, $data);
         Stand120_Database::log_activity('update_product', 'stand120_products', $id, $old, $data);
         
         wp_send_json_success(array('message' => 'Product updated successfully'));
@@ -246,11 +269,19 @@ class Stand120_Ajax_Handler {
      * Delete product
      */
     private static function delete_product() {
-        if (!Stand120_Auth::is_admin()) {
-            wp_send_json_error(array('message' => 'Unauthorized'));
+        // Check admin using WordPress directly
+        if (!current_user_can('administrator')) {
+            wp_send_json_error(array('message' => 'Unauthorized - Admin access required'));
+            return;
         }
         
         $id = intval($_POST['id'] ?? 0);
+        
+        if (!$id) {
+            wp_send_json_error(array('message' => 'Product ID is required'));
+            return;
+        }
+        
         Stand120_Database::delete_product($id);
         Stand120_Database::log_activity('delete_product', 'stand120_products', $id);
         
@@ -356,8 +387,10 @@ class Stand120_Ajax_Handler {
      * Update opening values (admin only)
      */
     private static function update_opening_values() {
-        if (!Stand120_Auth::is_admin()) {
-            wp_send_json_error(array('message' => 'Unauthorized'));
+        // Check admin using WordPress directly
+        if (!current_user_can('administrator')) {
+            wp_send_json_error(array('message' => 'Unauthorized - Admin access required'));
+            return;
         }
         
         $table = sanitize_text_field($_POST['table'] ?? '');
@@ -636,8 +669,10 @@ class Stand120_Ajax_Handler {
      * Get staff
      */
     private static function get_staff() {
-        if (!Stand120_Auth::is_admin()) {
-            wp_send_json_error(array('message' => 'Unauthorized'));
+        // Check admin using WordPress directly
+        if (!current_user_can('administrator')) {
+            wp_send_json_error(array('message' => 'Unauthorized - Admin access required'));
+            return;
         }
         
         $staff = Stand120_Auth::get_all_staff();
@@ -648,6 +683,12 @@ class Stand120_Ajax_Handler {
      * Create staff
      */
     private static function create_staff() {
+        // Check admin using WordPress directly
+        if (!current_user_can('administrator')) {
+            wp_send_json_error(array('message' => 'Unauthorized - Admin access required'));
+            return;
+        }
+        
         $data = array(
             'username' => sanitize_user($_POST['username'] ?? ''),
             'password' => $_POST['password'] ?? '',
@@ -669,6 +710,12 @@ class Stand120_Ajax_Handler {
      * Update staff
      */
     private static function update_staff_action() {
+        // Check admin using WordPress directly
+        if (!current_user_can('administrator')) {
+            wp_send_json_error(array('message' => 'Unauthorized - Admin access required'));
+            return;
+        }
+        
         $staff_id = intval($_POST['staff_id'] ?? 0);
         $data = array(
             'full_name' => sanitize_text_field($_POST['full_name'] ?? ''),
@@ -690,6 +737,12 @@ class Stand120_Ajax_Handler {
      * Delete staff
      */
     private static function delete_staff() {
+        // Check admin using WordPress directly
+        if (!current_user_can('administrator')) {
+            wp_send_json_error(array('message' => 'Unauthorized - Admin access required'));
+            return;
+        }
+        
         $staff_id = intval($_POST['staff_id'] ?? 0);
         $result = Stand120_Auth::delete_staff($staff_id);
         

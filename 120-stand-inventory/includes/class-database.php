@@ -340,7 +340,13 @@ class Stand120_Database {
         global $wpdb;
         $table = $wpdb->prefix . 'stand120_products';
         
-        return $wpdb->insert($table, $data);
+        $result = $wpdb->insert($table, $data);
+        
+        if ($result !== false) {
+            return $wpdb->insert_id;
+        }
+        
+        return false;
     }
     
     /**
