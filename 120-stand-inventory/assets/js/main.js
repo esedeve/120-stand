@@ -46,6 +46,22 @@
             $(document).on('focus', '.number-input', this.clearNumberFormat);
             $(document).on('blur', '.number-input', this.applyNumberFormat);
             
+            // Smart input behavior - clear 0 on focus for quantity inputs
+            $(document).on('focus', '.qty-input, .table-input[type="number"]', function() {
+                const val = $(this).val();
+                if (val === '0' || val === 0) {
+                    $(this).val('');
+                }
+            });
+            
+            // Restore 0 on blur if empty for quantity inputs
+            $(document).on('blur', '.qty-input, .table-input[type="number"]', function() {
+                const val = $(this).val();
+                if (val === '' || val === null || val === undefined) {
+                    $(this).val('0');
+                }
+            });
+            
             // Modal events
             $(document).on('click', '.modal-close, .modal-cancel', this.closeModal);
             $(document).on('click', '.modal-overlay', function(e) {
@@ -280,28 +296,90 @@
         },
         
         /**
-         * Show alert
+         * Show alert as popup (centered modal)
          */
-        showAlert: function(type, message) {
-            const alertHtml = `
-                <div class="alert alert-${type}" role="alert">
-                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : 'info-circle'}"></i>
-                    <span>${message}</span>
+        showAlert: function(type, message, autoRefresh = false) {
+            // Create popup overlay
+            const popupHtml = `
+                <div class="alert-popup-overlay" style="
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0,0,0,0.5);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 10000;
+                ">
+                    <div class="alert-popup" style="
+                        background: white;
+                        padding: 30px 40px;
+                        border-radius: 16px;
+                        text-align: center;
+                        max-width: 400px;
+                        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                        animation: popupSlide 0.3s ease;
+                    ">
+                        <div style="
+                            width: 60px;
+                            height: 60px;
+                            border-radius: 50%;
+                            background: ${type === 'success' ? '#10b981' : type === 'danger' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#3b82f6'};
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            margin: 0 auto 16px;
+                        ">
+                            <i class="fas fa-${type === 'success' ? 'check' : type === 'danger' ? 'times' : type === 'warning' ? 'exclamation' : 'info'}" style="color: white; font-size: 28px;"></i>
+                        </div>
+                        <h3 style="margin: 0 0 12px; color: #1a1a1a; font-size: 1.3rem;">${type === 'success' ? 'Success!' : type === 'danger' ? 'Error!' : type === 'warning' ? 'Warning!' : 'Info'}</h3>
+                        <p style="margin: 0 0 20px; color: #666; font-size: 1rem;">${message}</p>
+                        <button class="alert-popup-close btn btn-primary" style="min-width: 120px;">OK</button>
+                    </div>
                 </div>
             `;
             
-            // Remove existing alerts
-            $('.alert').remove();
+            // Add animation style if not exists
+            if (!$('#popup-animation-style').length) {
+                $('head').append(`
+                    <style id="popup-animation-style">
+                        @keyframes popupSlide {
+                            from { transform: scale(0.8); opacity: 0; }
+                            to { transform: scale(1); opacity: 1; }
+                        }
+                    </style>
+                `);
+            }
             
-            // Add new alert
-            $('.page-content').prepend(alertHtml);
+            // Remove existing popups
+            $('.alert-popup-overlay').remove();
             
-            // Auto-remove after 5 seconds
-            setTimeout(() => {
-                $('.alert').fadeOut(300, function() {
-                    $(this).remove();
-                });
-            }, 5000);
+            // Add popup to body
+            $('body').append(popupHtml);
+            
+            // Handle close
+            $('.alert-popup-close, .alert-popup-overlay').on('click', function(e) {
+                if (e.target === this || $(this).hasClass('alert-popup-close')) {
+                    $('.alert-popup-overlay').fadeOut(200, function() {
+                        $(this).remove();
+                        if (autoRefresh) {
+                            window.location.reload();
+                        }
+                    });
+                }
+            });
+            
+            // Auto-close after 3 seconds for success, then refresh if needed
+            if (type === 'success' && autoRefresh) {
+                setTimeout(() => {
+                    $('.alert-popup-overlay').fadeOut(200, function() {
+                        $(this).remove();
+                        window.location.reload();
+                    });
+                }, 2000);
+            }
         },
         
         /**
@@ -729,7 +807,8 @@ const TakeOrder = {
         Stand120.ajax('submit_order', data).then(response => {
             console.log('Order response:', response);
             if (response.success) {
-                Stand120.showAlert('success', 'Order #' + (response.data.order_id || '') + ' submitted successfully!');
+                // Show success popup and auto-refresh page
+                Stand120.showAlert('success', 'Order #' + (response.data.order_id || '') + ' submitted successfully!', true);
                 this.resetForm();
             } else {
                 Stand120.showAlert('danger', response.data?.message || 'Failed to submit order.');

@@ -36,12 +36,14 @@ class Stand120_Take_Order {
                 $wpdb->update($staff_table, array('status' => 'active'), array('id' => $staff_id));
             } else {
                 // Create new staff record
-                $wpdb->insert($staff_table, array(
+                $result = $wpdb->insert($staff_table, array(
                     'user_id' => $user_id,
                     'full_name' => $user->display_name,
                     'role' => current_user_can('administrator') ? 'admin' : 'staff'
                 ));
-                $staff_id = $wpdb->insert_id;
+                if ($result) {
+                    $staff_id = $wpdb->insert_id;
+                }
             }
         }
         
@@ -100,7 +102,7 @@ class Stand120_Take_Order {
         
         // Insert order
         $orders_table = $wpdb->prefix . 'stand120_orders';
-        $wpdb->insert($orders_table, array(
+        $insert_result = $wpdb->insert($orders_table, array(
             'staff_id' => $staff_id,
             'order_date' => date('Y-m-d'),
             'order_time' => date('H:i:s'),
@@ -113,6 +115,10 @@ class Stand120_Take_Order {
             'payment_confirmed' => $payment_confirmed,
             'synced' => isset($data['offline']) ? 0 : 1
         ));
+        
+        if ($insert_result === false) {
+            return array('success' => false, 'message' => 'Database error: ' . $wpdb->last_error);
+        }
         
         $order_id = $wpdb->insert_id;
         
@@ -134,7 +140,7 @@ class Stand120_Take_Order {
         }
         
         // Update financial summary
-        self::update_financial_summary($payment_method, $cash_amount, $transfer_amount, $grand_total, $delivery_fee);
+        self::update_financial_summary($payment_method, $cash_amount, $transfer_amount, $grand_total, $delivery_fee, $staff_id);
         
         Stand120_Database::log_activity('submit_order', 'stand120_orders', $order_id);
         
@@ -148,10 +154,14 @@ class Stand120_Take_Order {
     /**
      * Update financial summary after order
      */
-    private static function update_financial_summary($payment_method, $cash_amount, $transfer_amount, $grand_total, $delivery_fee) {
+    private static function update_financial_summary($payment_method, $cash_amount, $transfer_amount, $grand_total, $delivery_fee, $staff_id = null) {
         global $wpdb;
         $table = $wpdb->prefix . 'stand120_financial_summary';
         $today = date('Y-m-d');
+        
+        if (!$staff_id) {
+            $staff_id = Stand120_Auth::get_current_staff_id();
+        }
         
         // Get existing record for today
         $existing = $wpdb->get_row($wpdb->prepare(
@@ -172,7 +182,8 @@ class Stand120_Take_Order {
                 'cash_sales' => $new_cash_sales,
                 'transfer_sales' => $new_transfer_sales,
                 'delivery_fees' => $new_delivery_fees,
-                'cash_left' => $new_cash_left
+                'cash_left' => $new_cash_left,
+                'staff_id' => $staff_id
             ), array('id' => $existing->id));
         } else {
             // Get yesterday's cash left
@@ -181,10 +192,10 @@ class Stand120_Take_Order {
                 "SELECT cash_left FROM $table WHERE summary_date = %s",
                 $yesterday
             ));
-            $old_cash = $yesterday_record ? $yesterday_record->cash_left : 0;
+            $old_cash = $yesterday_record ? floatval($yesterday_record->cash_left) : 0;
             
             // Create new record
-            $cash_left = ($cash_amount + $old_cash) - 0; // No expenses yet
+            $cash_left = ($cash_amount + $old_cash); // No expenses yet
             
             $wpdb->insert($table, array(
                 'summary_date' => $today,
@@ -192,9 +203,11 @@ class Stand120_Take_Order {
                 'cash_sales' => $cash_amount,
                 'transfer_sales' => $transfer_amount,
                 'delivery_fees' => $delivery_fee,
+                'extras_amount' => 0,
+                'expenses_amount' => 0,
                 'old_cash' => $old_cash,
                 'cash_left' => $cash_left,
-                'staff_id' => Stand120_Auth::get_current_staff_id()
+                'staff_id' => $staff_id
             ));
         }
     }
